@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield, Briefcase, Search, List } from 'lucide-react'
+import { Briefcase, Search, List } from 'lucide-react'
 import ResumeManager from '@/components/ResumeManager'
 import JobDiscoveryDashboard from '@/components/JobDiscoveryDashboard'
 import ApplicationTracker from '@/components/ApplicationTracker'
+import Logo from '@/components/Logo'
 
 interface Resume {
   id: string
@@ -48,7 +49,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg">
-                <Shield className="w-8 h-8 text-white" />
+                <Logo className="w-8 h-8" />
               </div>
               <div>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-200 to-pink-200 bg-clip-text text-transparent">
