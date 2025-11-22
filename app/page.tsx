@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield } from 'lucide-react'
-import ResumeUploader from '@/components/ResumeUploader'
+import { Shield, Briefcase, Search, List } from 'lucide-react'
+import ResumeManager from '@/components/ResumeManager'
 import JobDiscoveryDashboard from '@/components/JobDiscoveryDashboard'
+import ApplicationTracker from '@/components/ApplicationTracker'
 
 interface Resume {
   id: string
@@ -16,6 +17,7 @@ interface Resume {
 export default function Home() {
   const [resumes, setResumes] = useState<Resume[]>([])
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'discovery' | 'tracker'>('discovery')
 
   // Load resumes from localStorage on mount
   useEffect(() => {
@@ -67,11 +69,11 @@ export default function Home() {
         </div>
       </header>
 
-{/* Main Content */}
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Resume Management */}
         <div className="mb-8">
-          <ResumeUploader 
+          <ResumeManager 
             resumes={resumes}
             setResumes={setResumes}
             selectedResumeId={selectedResumeId}
@@ -79,11 +81,43 @@ export default function Home() {
           />
         </div>
 
-        {/* Job Discovery Dashboard */}
-        <JobDiscoveryDashboard
-          resumeContent={resumeContent}
-          selectedResumeName={selectedResume?.name || ''}
-        />
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-4 mb-6">
+          <button
+            onClick={() => setActiveTab('discovery')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+              activeTab === 'discovery'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg scale-105'
+                : 'bg-slate-800/50 text-purple-300 hover:bg-slate-800 hover:text-purple-100'
+            }`}
+          >
+            <Search className="w-5 h-5" />
+            Job Discovery
+          </button>
+          <button
+            onClick={() => setActiveTab('tracker')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+              activeTab === 'tracker'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg scale-105'
+                : 'bg-slate-800/50 text-purple-300 hover:bg-slate-800 hover:text-purple-100'
+            }`}
+          >
+            <List className="w-5 h-5" />
+            Application Tracker
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="min-h-[600px]">
+          {activeTab === 'discovery' ? (
+            <JobDiscoveryDashboard
+              resumeContent={resumeContent}
+              selectedResumeName={selectedResume?.name || ''}
+            />
+          ) : (
+            <ApplicationTracker />
+          )}
+        </div>
       </div>
     </main>
   )

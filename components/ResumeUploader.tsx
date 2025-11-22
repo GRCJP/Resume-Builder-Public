@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Upload, FileText, Trash2, CheckCircle, AlertCircle } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Inbox } from 'lucide-react'
 import mammoth from 'mammoth'
 
 interface Resume {
@@ -27,11 +27,9 @@ export default function ResumeUploader({
 }: ResumeUploaderProps) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
+  const processFile = async (file: File) => {
     // Check if we already have 5 resumes
     if (resumes.length >= 5) {
       setError('Maximum 5 resumes allowed. Please delete one before uploading.')
@@ -81,10 +79,37 @@ export default function ResumeUploader({
       console.error(err)
     } finally {
       setUploading(false)
-      // Reset input
-      event.target.value = ''
     }
   }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    await processFile(file)
+    // Reset input
+    event.target.value = ''
+  }
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length === 0) return
+    
+    // Process only the first file
+    await processFile(files[0])
+  }, [resumes.length])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }, [])
 
   const extractTextFromFile = async (file: File): Promise<string> => {
     // Handle DOCX files
@@ -109,9 +134,33 @@ export default function ResumeUploader({
       })
     }
     
-    // Handle PDF (basic - just alert user)
+    // Handle PDF with dynamic import of pdfjs-dist
     if (file.type === 'application/pdf') {
-      throw new Error('PDF parsing not yet supported. Please save your resume as .docx or .txt for best results.')
+      try {
+        const pdfjsLib = await import('pdfjs-dist')
+        
+        // Configure worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+        
+        const arrayBuffer = await file.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        let fullText = ''
+        
+        // Extract text from all pages
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum)
+          const textContent = await page.getTextContent()
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ')
+          fullText += pageText + '\n'
+        }
+        
+        return fullText.trim()
+      } catch (err) {
+        console.error('Error parsing PDF:', err)
+        throw new Error('Failed to parse PDF file. Please try saving as DOCX or TXT.')
+      }
     }
     
     throw new Error('Unsupported file type')
@@ -162,25 +211,38 @@ export default function ResumeUploader({
       </div>
 
       <div className="p-6">
-        {/* Upload Button */}
+        {/* Drag and Drop Zone */}
         <div className="mb-6">
-          <label 
-            htmlFor="resume-upload" 
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg font-semibold"
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+              isDragging
+                ? 'border-purple-400 bg-purple-900/20'
+                : 'border-purple-500/50 bg-purple-900/10 hover:border-purple-400 hover:bg-purple-900/20'
+            } ${uploading || resumes.length >= 5 ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <Upload className="w-5 h-5 text-white" />
-            <span className="font-semibold text-white">
-              {uploading ? 'Uploading...' : resumes.length >= 5 ? 'Maximum resumes reached' : 'Upload Resume (PDF, DOCX, TXT)'}
-            </span>
-          </label>
-          <input
-            id="resume-upload"
-            type="file"
-            accept=".pdf,.docx,.txt"
-            onChange={handleFileUpload}
-            disabled={uploading || resumes.length >= 5}
-            className="hidden"
-          />
+            <input
+              id="resume-upload"
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={handleFileUpload}
+              disabled={uploading || resumes.length >= 5}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            
+            <Inbox className={`w-12 h-12 mx-auto mb-4 ${isDragging ? 'text-purple-300' : 'text-purple-400'}`} />
+            <p className="text-lg font-semibold text-purple-100 mb-2">
+              {uploading ? 'Processing...' : resumes.length >= 5 ? 'Maximum resumes reached' : 'Drop your resume here'}
+            </p>
+            <p className="text-sm text-purple-300 mb-4">
+              or click to browse
+            </p>
+            <p className="text-xs text-purple-400">
+              Supports PDF, DOCX, and TXT files • Up to 5 resumes
+            </p>
+          </div>
         </div>
 
         {/* Error Message */}

@@ -6,6 +6,8 @@ export interface ATSValidationResult {
   readabilityScore: number
   formattingScore: number
   sectionScore: number
+  quantificationScore: number // New: Measures measurable results
+  skillBalanceScore: number // New: Hard vs Soft skills balance
   issues: string[]
   recommendations: string[]
   industryComparison: {
@@ -19,6 +21,7 @@ export interface IndustryATSStandards {
   // Based on Jobscan, Resume Worded, and other ATS tools
   keywordMatchThreshold: number // 75-80% is good
   keywordDensityRange: { min: number; max: number } // 2-4% is optimal
+  quantificationTarget: number // Target % of bullet points with numbers
   criticalSectionsMustHave: string[]
   commonATSFailures: string[]
 }
@@ -26,6 +29,7 @@ export interface IndustryATSStandards {
 export const industryStandards: IndustryATSStandards = {
   keywordMatchThreshold: 75,
   keywordDensityRange: { min: 2, max: 4 },
+  quantificationTarget: 30, // 30% of bullets should have numbers
   criticalSectionsMustHave: [
     'work experience',
     'education',
@@ -88,15 +92,31 @@ export function validateAgainstIndustryATS(
     issues.push('Missing critical resume sections that ATS looks for.')
     recommendations.push('Ensure you have: Work Experience, Education, Skills, and Certifications sections.')
   }
+
+  // 5. QUANTIFICATION CHECK (Measurable Results)
+  const quantificationScore = checkQuantification(resumeContent)
+  if (quantificationScore < 50) {
+    issues.push('Resume lacks measurable results (numbers, percentages).')
+    recommendations.push('Quantify your achievements. Use numbers (e.g., "Reduced risk by 40%", "Managed $5M budget").')
+  }
+
+  // 6. SKILL BALANCE CHECK (Hard vs Soft Skills)
+  const skillBalanceScore = checkSkillBalance(resumeContent)
+  if (skillBalanceScore < 70) {
+    issues.push('Imbalanced mix of hard and soft skills.')
+    recommendations.push('Ensure you list both technical skills (tools, frameworks) and soft skills (leadership, communication).')
+  }
   
-  // 5. INDUSTRY COMPARISON
+  // 7. INDUSTRY COMPARISON
   // Adjust our score based on industry standards
   const estimatedATSScore = estimateIndustryATSScore(
     matchScore,
     keywordDensity,
     readabilityScore,
     formattingScore,
-    sectionScore
+    sectionScore,
+    quantificationScore,
+    skillBalanceScore
   )
   
   const confidence = calculateConfidence(matchScore, estimatedATSScore)
@@ -107,6 +127,8 @@ export function validateAgainstIndustryATS(
     readabilityScore,
     formattingScore,
     sectionScore,
+    quantificationScore,
+    skillBalanceScore,
     issues,
     recommendations,
     industryComparison: {
@@ -218,6 +240,60 @@ function checkRequiredSections(resume: string): number {
 }
 
 /**
+ * Check for measurable results (quantification)
+ * Returns score 0-100
+ */
+function checkQuantification(resume: string): number {
+  // Look for numbers, percentages, currency
+  const numberPattern = /\d+%|\$\d+|\d+\s+(years|months|people|teams|projects|audits|controls)/gi
+  const matches = resume.match(numberPattern) || []
+  
+  // Estimate bullet points (rough count based on newlines and common bullet markers)
+  const bulletPattern = /^[•\-\*]|\n[•\-\*]/gm
+  const bulletCount = (resume.match(bulletPattern) || []).length || 20 // Default to 20 if no bullets found
+  
+  const ratio = (matches.length / bulletCount) * 100
+  
+  // Target is 30% of bullets having numbers
+  return Math.min(100, (ratio / 30) * 100)
+}
+
+/**
+ * Check balance of hard vs soft skills
+ * Returns score 0-100
+ */
+function checkSkillBalance(resume: string): number {
+  const hardSkills = [
+    'python', 'sql', 'aws', 'azure', 'jira', 'tableau', 'linux', 'encryption',
+    'firewall', 'siem', 'ids/ips', 'nist', 'iso', 'soc', 'fedramp', 'pci',
+    'hipaa', 'gdpr', 'sox', 'risk management', 'audit', 'compliance'
+  ]
+  
+  const softSkills = [
+    'leadership', 'communication', 'collaboration', 'presentation', 'strategy',
+    'negotiation', 'mentoring', 'problem solving', 'analytical', 'teamwork',
+    'stakeholder', 'management', 'planning', 'coordination'
+  ]
+  
+  const resumeLower = resume.toLowerCase()
+  
+  const hardCount = hardSkills.filter(s => resumeLower.includes(s)).length
+  const softCount = softSkills.filter(s => resumeLower.includes(s)).length
+  
+  if (hardCount === 0 && softCount === 0) return 0
+  
+  // Ideal balance is roughly 60% hard, 40% soft for GRC
+  // We just want to ensure both are present reasonably
+  const hasHard = hardCount > 3
+  const hasSoft = softCount > 2
+  
+  if (hasHard && hasSoft) return 100
+  if (hasHard) return 60
+  if (hasSoft) return 40
+  return 20
+}
+
+/**
  * Estimate what industry ATS tools (Jobscan, Taleo, Workday) would score this
  * Based on research of how these tools weight different factors
  */
@@ -226,13 +302,17 @@ function estimateIndustryATSScore(
   keywordDensity: number,
   readabilityScore: number,
   formattingScore: number,
-  sectionScore: number
+  sectionScore: number,
+  quantificationScore: number,
+  skillBalanceScore: number
 ): number {
   // Industry ATS tools weight factors differently:
-  // - Keyword match: 50%
-  // - Keyword density: 20%
-  // - Formatting: 15%
+  // - Keyword match: 40%
+  // - Keyword density: 15%
+  // - Formatting: 10%
   // - Sections: 10%
+  // - Quantification (Measurable Results): 15%
+  // - Skill Balance: 5%
   // - Readability: 5%
   
   const keywordDensityScore = keywordDensity >= 2 && keywordDensity <= 4 ? 100 : 
@@ -243,10 +323,12 @@ function estimateIndustryATSScore(
                                  Math.max(0, 100 - Math.abs(11 - readabilityScore) * 10)
   
   const weighted = (
-    matchScore * 0.50 +
-    keywordDensityScore * 0.20 +
-    formattingScore * 0.15 +
+    matchScore * 0.40 +
+    keywordDensityScore * 0.15 +
+    formattingScore * 0.10 +
     sectionScore * 0.10 +
+    quantificationScore * 0.15 +
+    skillBalanceScore * 0.05 +
     readabilityNormalized * 0.05
   )
   
@@ -332,6 +414,8 @@ ${benchmark.likelihood}
 DETAILED BREAKDOWN:
 ------------------
 Keyword Match: ${validation.score}%
+Measurable Results: ${validation.quantificationScore}% (Target: >50%)
+Skill Balance: ${validation.skillBalanceScore}% (Target: >70%)
 Keyword Density: ${validation.keywordDensity.toFixed(1)}% (Optimal: 2-4%)
 Readability: Grade ${validation.readabilityScore.toFixed(1)} (Optimal: 10-12)
 Formatting: ${validation.formattingScore}/100
@@ -358,11 +442,10 @@ Based on research of Jobscan, Resume Worded, Taleo, and Workday ATS systems:
 
 HOW WE COMPARE TO INDUSTRY TOOLS:
 ---------------------------------
-Jobscan: Focuses heavily on keyword matching (50% weight)
-Resume Worded: Emphasizes formatting and sections (30% weight)
-Taleo/Workday: Balanced approach with keyword density checks (20% weight)
+Jobscan: Focuses heavily on keyword matching (40% weight)
+Resume Worded: Emphasizes measurable results and impact (30% weight)
+Taleo/Workday: Balanced approach with formatting checks (20% weight)
 
-Our algorithm: Uses weighted scoring similar to industry leaders, with added
-intelligence for synonym detection and context-aware matching.
+Our algorithm: Combines all these factors with GRC-specific intelligence.
 `
 }

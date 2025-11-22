@@ -2,10 +2,16 @@
 
 import { JobPosting } from './jobScanner'
 
+export type ApplicationStatus = 'saved' | 'applied' | 'interviewing' | 'offer' | 'rejected'
+
 export interface JobWithScore extends JobPosting {
   score?: number
   isNew?: boolean
   analyzedAt?: string
+  status?: ApplicationStatus
+  notes?: string
+  appliedDate?: string
+  lastUpdated?: string
 }
 
 export interface JobStorage {
@@ -17,6 +23,44 @@ export interface JobStorage {
 
 const STORAGE_KEY = 'jobDiscoveryData'
 const LAST_SEEN_KEY = 'jobLastSeen'
+
+/**
+ * Update job status and notes
+ */
+export function updateJobStatus(jobId: string, status: ApplicationStatus, notes?: string): void {
+  const storage = getJobStorage()
+  
+  storage.jobs = storage.jobs.map(job => {
+    if (job.id === jobId) {
+      return {
+        ...job,
+        status,
+        notes: notes !== undefined ? notes : job.notes,
+        appliedDate: status === 'applied' && !job.appliedDate ? new Date().toISOString() : job.appliedDate,
+        lastUpdated: new Date().toISOString()
+      }
+    }
+    return job
+  })
+  
+  saveJobStorage(storage)
+}
+
+/**
+ * Get jobs by status
+ */
+export function getJobsByStatus(status: ApplicationStatus): JobWithScore[] {
+  const storage = getJobStorage()
+  return storage.jobs.filter(job => job.status === status)
+}
+
+/**
+ * Get all tracked jobs (any status other than undefined)
+ */
+export function getTrackedJobs(): JobWithScore[] {
+  const storage = getJobStorage()
+  return storage.jobs.filter(job => job.status !== undefined)
+}
 
 /**
  * Get all stored jobs

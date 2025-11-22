@@ -8,139 +8,147 @@ export interface KeywordGroup {
 }
 
 export const federalGRCKeywords: KeywordGroup[] = [
-  // Critical Federal Terms
+  // Critical Federal Terms (Balanced Weights)
   {
     primary: 'fedramp',
     synonyms: ['fed ramp', 'federal risk and authorization management program'],
-    weight: 5,
+    weight: 4,
     category: 'framework'
   },
   {
     primary: 'ato',
     synonyms: ['authorization to operate', 'authority to operate', 'ato process'],
-    weight: 5,
+    weight: 4,
     category: 'authorization'
   },
   {
     primary: 'poam',
     synonyms: ['poa&m', 'plan of action and milestones', 'plan of actions and milestones', 'poams'],
-    weight: 5,
+    weight: 4,
     category: 'documentation'
   },
   {
     primary: 'ssp',
     synonyms: ['system security plan', 'system security plans', 'ssps'],
-    weight: 5,
+    weight: 4,
     category: 'documentation'
   },
   {
     primary: 'rmf',
     synonyms: ['risk management framework', 'nist rmf', 'rmf process'],
-    weight: 5,
+    weight: 4,
     category: 'framework'
   },
   {
     primary: 'fisma',
     synonyms: ['federal information security management act', 'fisma compliance'],
-    weight: 5,
+    weight: 4,
     category: 'framework'
   },
   
   // NIST Standards
   {
     primary: 'nist 800-53',
-    synonyms: ['nist sp 800-53', '800-53', 'nist 80053', 'sp 800-53'],
-    weight: 5,
+    synonyms: ['nist sp 800-53', '800-53', 'nist 80053', 'sp 800-53', 'nist controls'],
+    weight: 4,
     category: 'standard'
   },
   {
     primary: 'nist 800-37',
     synonyms: ['nist sp 800-37', '800-37', 'nist 80037', 'sp 800-37'],
-    weight: 4,
-    category: 'standard'
-  },
-  {
-    primary: 'nist 800-171',
-    synonyms: ['nist sp 800-171', '800-171', 'nist 80171', 'sp 800-171'],
-    weight: 4,
-    category: 'standard'
-  },
-  
-  // Roles and Responsibilities
-  {
-    primary: 'isso',
-    synonyms: ['information system security officer', 'information systems security officer', 'issos'],
-    weight: 4,
-    category: 'role'
-  },
-  {
-    primary: 'issm',
-    synonyms: ['information system security manager', 'information systems security manager'],
     weight: 3,
-    category: 'role'
+    category: 'standard'
   },
   
-  // Processes
-  {
-    primary: 'continuous monitoring',
-    synonyms: ['conmon', 'ongoing monitoring', 'continuous assessment'],
-    weight: 4,
-    category: 'process'
-  },
-  {
-    primary: 'security assessment',
-    synonyms: ['security assessments', 'sar', 'security assessment report', 'control assessment'],
-    weight: 4,
-    category: 'process'
-  },
-  {
-    primary: 'risk assessment',
-    synonyms: ['risk assessments', 'security risk assessment', 'risk analysis'],
-    weight: 4,
-    category: 'process'
-  },
-  {
-    primary: 'vulnerability management',
-    synonyms: ['vuln management', 'vulnerability scanning', 'vulnerability assessment'],
-    weight: 4,
-    category: 'process'
-  },
-  
-  // Commercial Frameworks
+  // Commercial Frameworks (Increased Importance)
   {
     primary: 'iso 27001',
-    synonyms: ['iso27001', 'iso 27001:2013', 'iso 27001:2022'],
-    weight: 3,
+    synonyms: ['iso27001', 'iso 27001:2013', 'iso 27001:2022', 'iso 27000 series'],
+    weight: 4,
     category: 'framework'
   },
   {
     primary: 'soc 2',
-    synonyms: ['soc2', 'soc ii', 'soc 2 type 2', 'soc 2 type ii'],
-    weight: 3,
+    synonyms: ['soc2', 'soc ii', 'soc 2 type 2', 'soc 2 type ii', 'ssae 18'],
+    weight: 4,
     category: 'framework'
   },
   {
     primary: 'pci dss',
-    synonyms: ['pci-dss', 'pci', 'payment card industry'],
+    synonyms: ['pci-dss', 'pci', 'payment card industry', 'pci compliance'],
+    weight: 4,
+    category: 'framework'
+  },
+  {
+    primary: 'hipaa',
+    synonyms: ['health insurance portability and accountability act', 'hitrust'],
+    weight: 4,
+    category: 'framework'
+  },
+  {
+    primary: 'gdpr',
+    synonyms: ['general data protection regulation', 'privacy regulation'],
     weight: 3,
     category: 'framework'
   },
   
-  // Tools and Platforms
+  // Risk Management (High Value)
   {
-    primary: 'servicenow',
-    synonyms: ['service now', 'servicenow grc'],
-    weight: 2,
-    category: 'tool'
+    primary: 'risk assessment',
+    synonyms: ['risk assessments', 'security risk assessment', 'risk analysis', 'risk register', 'risk appetite', 'managing risk', 'risk management'],
+    weight: 5,
+    category: 'process'
   },
   {
-    primary: 'jira',
-    synonyms: ['atlassian jira', 'jira software'],
-    weight: 2,
-    category: 'tool'
+    primary: 'compliance audits',
+    synonyms: ['compliance audit', 'security audits', 'audit management', 'managing audits', 'oversight of audits', 'audit oversight', 'audit compliance'],
+    weight: 5,
+    category: 'process'
   },
-  
-  // Cloud and Technical
+  {
+    primary: 'penetration testing',
+    synonyms: ['penetration testing', 'pen testing', 'pentest', 'ethical hacking', 'security testing', 'vulnerability testing', 'overseeing penetration testing', 'pentest oversight'],
+    weight: 4,
+    category: 'process'
+  },
+  {
+    primary: 'vulnerability scanning',
+    synonyms: ['vulnerability scans', 'vulnerability scanning', 'vulnerability assessment', 'vulnerability management', 'handling vulnerability scans', 'vulnerability reporting', 'scan management'],
+    weight: 4,
+    category: 'process'
+  },
+  {
+    primary: 'security awareness',
+    synonyms: ['cybersecurity awareness', 'security awareness training', 'awareness initiatives', 'security training', 'awareness programs', 'cyber awareness'],
+    weight: 3,
+    category: 'process'
+  },
+  {
+    primary: 'incident response',
+    synonyms: ['incident response', 'security incident response', 'ir', 'incident handling', 'on-call incident response', 'security incidents', 'emergency response'],
+    weight: 4,
+    category: 'process'
+  },
+  {
+    primary: 'third party risk',
+    synonyms: ['tpr', 'tprm', 'vendor risk', 'vendor assessment', 'supply chain risk'],
+    weight: 5,
+    category: 'process'
+  },
+  {
+    primary: 'control testing',
+    synonyms: ['control validation', 'control effectiveness', 'audit testing', 'internal audit'],
+    weight: 4,
+    category: 'process'
+  },
+
+  // Technical & Engineering (Boosted for "Full Gamut")
+  {
+    primary: 'cloud security',
+    synonyms: ['cloud infrastructure', 'aws security', 'azure security', 'gcp security'],
+    weight: 4,
+    category: 'cloud'
+  },
   {
     primary: 'aws',
     synonyms: ['amazon web services', 'aws cloud'],
@@ -152,6 +160,32 @@ export const federalGRCKeywords: KeywordGroup[] = [
     synonyms: ['microsoft azure', 'azure cloud'],
     weight: 3,
     category: 'cloud'
+  },
+  {
+    primary: 'python',
+    synonyms: ['python scripting', 'automation', 'scripting'],
+    weight: 3,
+    category: 'technical'
+  },
+  {
+    primary: 'siem',
+    synonyms: ['splunk', 'datadog', 'sumo logic', 'log analysis'],
+    weight: 3,
+    category: 'technical'
+  },
+  
+  // Tools and Platforms
+  {
+    primary: 'grc tools',
+    synonyms: ['servicenow', 'archer', 'metricstream', 'logicgate', 'auditboard', 'drata', 'vanta'],
+    weight: 3,
+    category: 'tool'
+  },
+  {
+    primary: 'jira',
+    synonyms: ['atlassian jira', 'jira software', 'confluence'],
+    weight: 2,
+    category: 'tool'
   },
   
   // Certifications
@@ -172,6 +206,18 @@ export const federalGRCKeywords: KeywordGroup[] = [
     synonyms: ['certified information systems auditor'],
     weight: 3,
     category: 'certification'
+  },
+  {
+    primary: 'crisc',
+    synonyms: ['certified in risk and information systems control'],
+    weight: 3,
+    category: 'certification'
+  },
+  {
+    primary: 'ccsp',
+    synonyms: ['certified cloud security professional'],
+    weight: 3,
+    category: 'certification'
   }
 ]
 
@@ -185,9 +231,74 @@ export function smartMatch(jobDescription: string, resumeContent: string): {
   const jd = jobDescription.toLowerCase()
   const resume = resumeContent.toLowerCase()
   
+  // Enhanced context matching - look for action verbs + concepts
+  const contextMatches = [
+    // Managing/overseeing + security concepts
+    { pattern: /\b(managing|oversight|overseeing|handling|coordinating|leading)\s+(security|compliance|audit|penetration|vulnerability|risk)/, keywords: ['compliance audits', 'penetration testing', 'vulnerability scanning', 'risk assessment'] },
+    // Participation in security initiatives
+    { pattern: /\b(participating|participated|participate)\s+(in\s+)?(cybersecurity|security)\s+(awareness|training|initiatives)/, keywords: ['security awareness'] },
+    // On-call responsibilities
+    { pattern: /\b(on-?call|on call)\s+(responsibilities|duties|support|incident)/, keywords: ['incident response'] },
+    // Vulnerability scanning and reporting
+    { pattern: /\b(vulnerability\s+(scans|scanning|scan|assessment|management))\s+(and\s+)?(reporting|reports)/, keywords: ['vulnerability scanning'] },
+    // Penetration testing process familiarity
+    { pattern: /\b(familiar|familiarity)\s+(with\s+)?(the\s+)?(penetration\s+testing|pentest|pen\s+test)\s+(process|procedures|roe)/, keywords: ['penetration testing'] },
+    // Compliance audit management
+    { pattern: /\b(managing|manage|handled|handling)\s+(security\s+)?(compliance\s+)?(audits|audit)/, keywords: ['compliance audits'] }
+  ]
+  
   const details: Array<{keyword: string, found: boolean, weight: number, category: string}> = []
   let totalWeight = 0
   let matchedWeight = 0
+  
+  // Check context matches first
+  contextMatches.forEach(match => {
+    const jdMatch = match.pattern.test(jd)
+    const resumeMatch = match.pattern.test(resume)
+    
+    if (jdMatch) {
+      match.keywords.forEach(keyword => {
+        const group = federalGRCKeywords.find(g => g.primary === keyword)
+        if (group) {
+          totalWeight += group.weight
+          
+          // Enhanced resume matching - check multiple patterns
+          let inResume = false
+          
+          // 1. Check direct keyword matches
+          if ([group.primary, ...group.synonyms].some(term => resume.includes(term))) {
+            inResume = true
+          }
+          // 2. Check context pattern matches in resume
+          else if (resumeMatch) {
+            inResume = true
+          }
+          // 3. Check for broader concept matches
+          else if (keyword === 'compliance audits' && 
+                  (/\b(compliance|audit|auditing|audits)\b/.test(resume) ||
+                   /\b(managing|handle|lead|coordinate)\b.*\b(audit|compliance)\b/.test(resume))) {
+            inResume = true
+          }
+          else if (keyword === 'security awareness' && 
+                  (/\b(awareness|training|education|initiatives)\b.*\b(security|cybersecurity)\b/.test(resume) ||
+                   /\b(security|cybersecurity)\b.*\b(awareness|training|education)\b/.test(resume))) {
+            inResume = true
+          }
+          
+          if (inResume) {
+            matchedWeight += group.weight
+          }
+          
+          details.push({
+            keyword: group.primary,
+            found: inResume,
+            weight: group.weight,
+            category: group.category
+          })
+        }
+      })
+    }
+  })
   
   federalGRCKeywords.forEach(group => {
     // Check if keyword or any synonym appears in job description
@@ -203,12 +314,15 @@ export function smartMatch(jobDescription: string, resumeContent: string): {
         matchedWeight += group.weight
       }
       
-      details.push({
-        keyword: group.primary,
-        found: inResume,
-        weight: group.weight,
-        category: group.category
-      })
+      // Avoid duplicates from context matching
+      if (!details.find(d => d.keyword === group.primary)) {
+        details.push({
+          keyword: group.primary,
+          found: inResume,
+          weight: group.weight,
+          category: group.category
+        })
+      }
     }
   })
   
