@@ -72,87 +72,6 @@ export default function JobDiscoveryDashboard({ resumeContent, selectedResumeNam
   }
 
   // Helper for diverse demo jobs if scraping fails
-  const generateDemoJobs = (role: string) => [
-    {
-      id: `demo-1-${Date.now()}`,
-      title: 'Senior GRC Analyst',
-      company: 'TechCorp Secure',
-      location: 'Remote',
-      description: 'Leading GRC initiatives, NIST 800-53 compliance, and risk assessments.',
-      url: 'https://example.com/demo-job-1',
-      source: 'ai-engine',
-      postedDate: new Date().toISOString(),
-      salary: '$110,000 - $140,000',
-      remote: true,
-      score: 95
-    },
-    {
-      id: `demo-2-${Date.now()}`,
-      title: 'Cybersecurity Engineer',
-      company: 'CloudScale Inc',
-      location: 'New York, NY',
-      description: 'Designing secure cloud architecture, implementing AWS security controls, and automating compliance checks.',
-      url: 'https://example.com/demo-job-2',
-      source: 'linkedin',
-      postedDate: new Date().toISOString(),
-      salary: '$140,000 - $180,000',
-      remote: false,
-      score: 82
-    },
-    {
-      id: `demo-3-${Date.now()}`,
-      title: 'IT Risk Manager',
-      company: 'Global FinTech',
-      location: 'Remote',
-      description: 'Managing vendor risk program, conducting third-party assessments, and reporting to the CISO.',
-      url: 'https://example.com/demo-job-3',
-      source: 'indeed',
-      postedDate: new Date().toISOString(),
-      salary: '$130,000 - $160,000',
-      remote: true,
-      score: 72
-    },
-    {
-      id: `demo-4-${Date.now()}`,
-      title: 'Security Compliance Manager',
-      company: 'FedSecure Solutions',
-      location: 'Washington DC',
-      description: 'Leading FedRAMP authorization efforts and managing continuous monitoring for federal clients.',
-      url: 'https://example.com/demo-job-4',
-      source: 'usajobs',
-      postedDate: new Date().toISOString(),
-      salary: '$120,000 - $150,000',
-      remote: false,
-      score: 88
-    },
-    {
-      id: `demo-5-${Date.now()}`,
-      title: 'Cloud Security Architect',
-      company: 'NextGen Tech',
-      location: 'Remote',
-      description: 'Defining security standards for multi-cloud environments and leading security reviews.',
-      url: 'https://example.com/demo-job-5',
-      source: 'linkedin',
-      postedDate: new Date().toISOString(),
-      salary: '$160,000 - $200,000',
-      remote: true,
-      score: 65
-    },
-    {
-      id: `demo-6-${Date.now()}`,
-      title: 'Information Security Manager',
-      company: 'HealthTech Systems',
-      location: 'Boston, MA',
-      description: 'Managing enterprise security program, HIPAA compliance, and incident response.',
-      url: 'https://example.com/demo-job-6',
-      source: 'indeed',
-      postedDate: new Date().toISOString(),
-      salary: '$150,000 - $190,000',
-      remote: false,
-      score: 78
-    }
-  ]
-
   const runMatchingEngine = async () => {
     if (!resumeContent) {
       setStatusMessage('⚠️ Upload a resume to start the AI Matching Engine')
@@ -171,16 +90,40 @@ export default function JobDiscoveryDashboard({ resumeContent, selectedResumeNam
       const activeQueries = tailoredQueries.slice(0, 3)
       console.log('🎯 AI Targeting Strategy:', activeQueries)
 
-      // 2. Execute Multi-Pronged Search
+      // 2. Execute Multi-Pronged Search - Focus on Remote/Hybrid jobs
       let allNewJobs: any[] = []
       
       for (const query of activeQueries) {
-        setStatusMessage(`🕵️‍♀️ Scouting top sites for "${query}" roles...`)
+        setStatusMessage(`🕵️‍♀️ Scouting remote/hybrid "${query}" roles...`)
         // Add a small delay to be polite to APIs and UI
         await new Promise(resolve => setTimeout(resolve, 500))
         
-        const jobs = await searchAllJobBoards([query], 'Washington DC') // Can make location dynamic later
-        allNewJobs = [...allNewJobs, ...jobs]
+        // Prioritize remote work with multiple search strategies
+        const searchStrategies = [
+          // Remote-specific searches
+          { keywords: [query, 'remote'], location: 'Remote' },
+          { keywords: [query, 'work from home'], location: 'Remote' },
+          { keywords: [query, 'hybrid'], location: 'Remote' },
+          
+          // Major tech hubs (for hybrid opportunities)
+          { keywords: [query, 'remote'], location: 'San Francisco' },
+          { keywords: [query, 'remote'], location: 'New York' },
+          { keywords: [query, 'remote'], location: 'Austin' },
+          { keywords: [query, 'remote'], location: 'Seattle' },
+          { keywords: [query, 'remote'], location: 'Los Angeles' },
+          
+          // General searches (catch-all)
+          { keywords: [query], location: 'United States' }
+        ]
+        
+        let queryJobs: any[] = []
+        
+        for (const strategy of searchStrategies) {
+          const jobs = await searchAllJobBoards(strategy.keywords, strategy.location)
+          queryJobs = [...queryJobs, ...jobs]
+        }
+        
+        allNewJobs = [...allNewJobs, ...queryJobs]
       }
 
       // 2b. Fetch from Remote Job APIs (RemoteOK, etc.) - Reliable & CORS friendly
@@ -192,20 +135,39 @@ export default function JobDiscoveryDashboard({ resumeContent, selectedResumeNam
       }))
       allNewJobs = [...allNewJobs, ...formattedRemoteJobs]
 
-      // 3. Filter & Deduplicate
+      // 3. Filter & Deduplicate + Prioritize Remote/Hybrid
       const uniqueJobs = Array.from(new Map(allNewJobs.map(item => [item.id, item])).values())
       
-      console.log(`✅ Engine found ${uniqueJobs.length} candidates across ${activeQueries.length} vectors`)
+      // Prioritize remote and hybrid jobs
+      const prioritizedJobs = uniqueJobs.sort((a, b) => {
+        const aRemote = a.remote || a.location?.toLowerCase().includes('remote') || a.description?.toLowerCase().includes('remote')
+        const bRemote = b.remote || b.location?.toLowerCase().includes('remote') || b.description?.toLowerCase().includes('remote')
+        const aHybrid = a.location?.toLowerCase().includes('hybrid') || a.description?.toLowerCase().includes('hybrid')
+        const bHybrid = b.location?.toLowerCase().includes('hybrid') || b.description?.toLowerCase().includes('hybrid')
+        
+        // Remote jobs first, then hybrid, then onsite
+        if (aRemote && !bRemote) return -1
+        if (!aRemote && bRemote) return 1
+        if (aRemote && bRemote) return 0
+        
+        if (aHybrid && !bHybrid) return -1
+        if (!aHybrid && bHybrid) return 1
+        
+        return 0
+      })
+      
+      console.log(`✅ Engine found ${prioritizedJobs.length} candidates (${prioritizedJobs.filter(j => j.remote || j.location?.toLowerCase().includes('remote')).length} remote) across ${activeQueries.length} vectors`)
 
-      // If no jobs found, add demo jobs for testing (Smart Demo Generation)
-      if (uniqueJobs.length === 0) {
-        console.warn(`⚠️ No live jobs found. Generating high-fidelity test candidates.`)
-        const demoJobs = generateDemoJobs(activeQueries[0])
-        uniqueJobs.push(...demoJobs)
+      // If no real jobs found, show appropriate message but don't generate demo jobs
+      if (prioritizedJobs.length === 0) {
+        console.warn(`⚠️ No live jobs found for current search terms.`)
+        setStatusMessage('🔍 No jobs found. Try different keywords or check back later.')
+        setIsScanning(false)
+        return
       }
 
       // 4. Save & Score
-      addJobs(uniqueJobs as JobWithScore[], 'ai-engine')
+      addJobs(prioritizedJobs as JobWithScore[], 'ai-engine')
       updateLastSeen('ai-engine')
 
       // Reload to get fresh list
