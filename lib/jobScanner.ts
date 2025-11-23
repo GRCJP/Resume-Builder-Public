@@ -7,7 +7,7 @@ export interface JobPosting {
   location: string
   description: string
   url: string
-  source: 'indeed' | 'linkedin' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'other'
+  source: 'indeed' | 'linkedin' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'other' | 'curated'
   postedDate: string
   matchScore: number
   salary?: string

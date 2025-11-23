@@ -6,7 +6,7 @@ import ResumeManager from '@/components/ResumeManager'
 import JobDiscoveryDashboard from '@/components/JobDiscoveryDashboard'
 import ApplicationTracker from '@/components/ApplicationTracker'
 import Logo from '@/components/Logo'
-import ErrorBoundary from '@/components/ErrorBoundary'
+import ErrorBoundary, { setupGlobalErrorHandlers } from '@/components/ErrorBoundary'
 
 interface Resume {
   id: string
@@ -20,6 +20,11 @@ export default function Home() {
   const [resumes, setResumes] = useState<Resume[]>([])
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'discovery' | 'tracker'>('discovery')
+
+  // Setup global error handlers for browser extension conflicts
+  useEffect(() => {
+    setupGlobalErrorHandlers()
+  }, [])
 
   // Load resumes from localStorage on mount
   useEffect(() => {

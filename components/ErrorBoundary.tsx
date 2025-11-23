@@ -38,7 +38,8 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
 
 function DefaultErrorFallback({ error }: { error?: Error }) {
   const isBrowserExtensionError = error?.message?.includes('ethereum') || 
-                                 error?.message?.includes('chrome-extension')
+                                 error?.message?.includes('chrome-extension') ||
+                                 error?.message?.includes('Cannot set property')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
@@ -90,4 +91,56 @@ function DefaultErrorFallback({ error }: { error?: Error }) {
       </div>
     </div>
   )
+}
+
+// Global error handler for browser extension conflicts
+export function setupGlobalErrorHandlers() {
+  // Proactively prevent browser extensions from interfering
+  try {
+    // Freeze window.ethereum to prevent extension modifications
+    if (typeof window !== 'undefined' && (window as any).ethereum) {
+      Object.defineProperty(window, 'ethereum', {
+        value: (window as any).ethereum,
+        writable: false,
+        configurable: false
+      })
+    }
+  } catch (e) {
+    // Silently handle any errors during setup
+  }
+
+  // Catch unhandled errors from browser extensions
+  window.addEventListener('error', (event) => {
+    if (event.message?.includes('ethereum') || 
+        event.message?.includes('chrome-extension') ||
+        event.message?.includes('Cannot set property')) {
+      console.warn('🛡️ Browser extension conflict suppressed:', event.message)
+      event.preventDefault()
+      event.stopPropagation()
+      return false
+    }
+  })
+
+  // Catch unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason?.message?.includes('ethereum') || 
+        event.reason?.message?.includes('chrome-extension') ||
+        event.reason?.message?.includes('Cannot set property')) {
+      console.warn('🛡️ Browser extension promise rejection suppressed:', event.reason)
+      event.preventDefault()
+      return false
+    }
+  })
+
+  // Override console.error to filter out extension errors
+  const originalConsoleError = console.error
+  console.error = (...args) => {
+    const message = args.join(' ')
+    if (message.includes('ethereum') || 
+        message.includes('chrome-extension') ||
+        message.includes('Cannot set property')) {
+      return // Suppress extension-related errors
+    }
+    originalConsoleError.apply(console, args)
+  }
 }

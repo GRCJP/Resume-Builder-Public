@@ -63,7 +63,64 @@ export function getTrackedJobs(): JobWithScore[] {
 }
 
 /**
- * Get all stored jobs
+ * Remove jobs older than 7 days to keep listings fresh
+ */
+export function removeOldJobs(): number {
+  try {
+    const storage = getJobStorage()
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    
+    const oldJobCount = storage.jobs.length
+    const freshJobs = storage.jobs.filter(job => {
+      const jobDate = new Date(job.postedDate || job.lastUpdated || Date.now())
+      return jobDate > sevenDaysAgo
+    })
+    
+    const removedCount = oldJobCount - freshJobs.length
+    
+    if (removedCount > 0) {
+      const cleanedStorage: JobStorage = {
+        ...storage,
+        jobs: freshJobs
+      }
+      
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanedStorage))
+      console.log(`🗑️ Auto-removed ${removedCount} jobs older than 7 days`)
+    }
+    
+    return removedCount
+  } catch (error) {
+    console.error('Error removing old jobs:', error)
+    return 0
+  }
+}
+
+/**
+ * Clear demo jobs from storage (cleanup function)
+ */
+export function clearDemoJobs(): void {
+  try {
+    const storage = getJobStorage()
+    const realJobs = storage.jobs.filter(job => 
+      !job.id.includes('demo-') && 
+      !job.url?.includes('example.com')
+    )
+    
+    const cleanedStorage: JobStorage = {
+      ...storage,
+      jobs: realJobs
+    }
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanedStorage))
+    console.log(`🧹 Cleaned ${storage.jobs.length - realJobs.length} demo jobs from storage`)
+  } catch (error) {
+    console.error('Error clearing demo jobs:', error)
+  }
+}
+
+/**
+ * Get all stored jobs (filtered for real jobs only)
  */
 export function getStoredJobs(): JobWithScore[] {
   try {
@@ -71,7 +128,15 @@ export function getStoredJobs(): JobWithScore[] {
     if (!data) return []
     
     const storage: JobStorage = JSON.parse(data)
-    return storage.jobs || []
+    const jobs = storage.jobs || []
+    
+    // Filter out demo jobs
+    const realJobs = jobs.filter(job => 
+      !job.id.includes('demo-') && 
+      !job.url?.includes('example.com')
+    )
+    
+    return realJobs
   } catch (error) {
     console.error('Error loading jobs:', error)
     return []
