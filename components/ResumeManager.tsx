@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Inbox, Target, TrendingUp, Shield, Briefcase, Wand2, Download, FileSearch, Sparkles } from 'lucide-react'
 import mammoth from 'mammoth'
 import { smartMatch } from '@/lib/smartMatcher'
@@ -33,18 +33,20 @@ interface ResumeManagerProps {
   setResumes: (resumes: Resume[]) => void
   selectedResumeId: string | null
   setSelectedResumeId: (id: string | null) => void
+  jobDescription?: string
 }
 
 export default function ResumeManager({ 
   resumes, 
   setResumes, 
   selectedResumeId, 
-  setSelectedResumeId 
+  setSelectedResumeId,
+  jobDescription
 }: ResumeManagerProps) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [jobDescription, setJobDescription] = useState('')
+  const [localJobDescription, setLocalJobDescription] = useState(jobDescription || '')
   const [analysis, setAnalysis] = useState<JobAnalysis | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [atsValidation, setAtsValidation] = useState<any>(null)
@@ -54,6 +56,13 @@ export default function ResumeManager({
 
   const selectedResume = resumes.find(r => r.id === selectedResumeId)
   const resumeContent = selectedResume?.content || ''
+
+  // Update job description when prop changes
+  useEffect(() => {
+    if (jobDescription !== undefined) {
+      setLocalJobDescription(jobDescription)
+    }
+  }, [jobDescription])
 
   const processFile = async (file: File) => {
     if (resumes.length >= 5) {
@@ -204,7 +213,7 @@ export default function ResumeManager({
       return
     }
     
-    if (!jobDescription.trim()) {
+    if (!localJobDescription.trim()) {
       setError('Please enter a job description')
       return
     }
@@ -214,10 +223,10 @@ export default function ResumeManager({
     
     try {
       // Use smart matching
-      const smartMatchResult = smartMatch(jobDescription, resumeContent)
+      const smartMatchResult = smartMatch(localJobDescription, resumeContent)
       
       // Extract keywords from job description
-      const jd = jobDescription.toLowerCase()
+      const jd = localJobDescription.toLowerCase()
       const grcKeywords = [
         'grc', 'governance', 'risk', 'compliance', 'audit', 'framework', 'controls',
         'nist', 'iso 27001', 'sox', 'hipaa', 'pci dss', 'gdpr', 'ccpa', 'fedramp',
@@ -252,7 +261,7 @@ export default function ResumeManager({
       const experienceReqs = expMatch.map(e => e.trim())
 
       const actionVerbs = ['develop', 'implement', 'manage', 'lead', 'coordinate', 'conduct', 'perform', 'maintain', 'ensure', 'support', 'assess', 'analyze', 'review', 'monitor', 'report', 'collaborate', 'establish', 'define', 'create', 'execute']
-      const sentences = jobDescription.split(/[.!?]+/)
+      const sentences = localJobDescription.split(/[.!?]+/)
       const responsibilities = sentences
         .filter(s => actionVerbs.some(verb => s.toLowerCase().includes(verb)))
         .slice(0, 8)
@@ -273,7 +282,7 @@ export default function ResumeManager({
       }
 
       // Validate against ATS standards
-      const atsResult = validateAgainstIndustryATS(resumeContent, jobDescription, smartMatchResult.matchScore)
+      const atsResult = validateAgainstIndustryATS(resumeContent, localJobDescription, smartMatchResult.matchScore)
       setAtsValidation(atsResult)
       
       setAnalysis(analysisResult)
@@ -314,7 +323,7 @@ export default function ResumeManager({
     setIsTailoring(true)
     
     try {
-      const smartEnhancements = enhanceResumeWithKeywords(resumeContent, analysis.missingKeywords, jobDescription)
+      const smartEnhancements = enhanceResumeWithKeywords(resumeContent, analysis.missingKeywords, localJobDescription)
       let enhanced = resumeContent
       
       // Add missing keywords naturally
@@ -343,7 +352,7 @@ KEY SKILLS & EXPERTISE:
       setTailoredResume(enhanced)
       
       // Calculate new match score
-      const newMatch = smartMatch(jobDescription, enhanced)
+      const newMatch = smartMatch(localJobDescription, enhanced)
       setNewMatchScore(newMatch.matchScore)
       
       setIsTailoring(false)
@@ -497,8 +506,8 @@ KEY SKILLS & EXPERTISE:
                 Job Description
               </h3>
               <textarea
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
+                value={localJobDescription}
+                onChange={(e) => setLocalJobDescription(e.target.value)}
                 rows={8}
                 className="w-full px-3 py-2 bg-slate-700/50 border border-purple-500/30 rounded-lg text-purple-100 placeholder-purple-400 focus:outline-none focus:border-purple-400 text-sm"
                 placeholder="Paste job description here for ATS scoring and comparison..."
@@ -506,7 +515,7 @@ KEY SKILLS & EXPERTISE:
               
               <button
                 onClick={analyzeJobMatch}
-                disabled={!resumeContent || !jobDescription.trim() || isAnalyzing}
+                disabled={!resumeContent || !localJobDescription.trim() || isAnalyzing}
                 className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed text-sm font-semibold"
               >
                 <Target className="w-4 h-4" />

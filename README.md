@@ -211,6 +211,14 @@ MIT License - Use it, modify it, share it. Let's help more GRC professionals lan
 
 *"Your resume isn't your biography - it's your marketing material. Make every word count."*
 
+---
+
+## 📚 Foundational Guidance
+
+This tool was built on AJ's guidance from the GRC Engineering Club. [Read the complete resume strategy that shaped this project](./docs/resume-guidance.md).
+
+---
+
 See `Resume/README.md` for full details and next steps.
 
 ## 🆕 Resume Upload & Job Matching

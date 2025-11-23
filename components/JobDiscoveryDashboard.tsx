@@ -29,11 +29,12 @@ import { searchRemoteJobs } from '@/lib/remoteJobsAPI'
 interface JobDiscoveryDashboardProps {
   resumeContent: string
   selectedResumeName: string
+  onTailorResume?: (jobDescription: string, jobTitle: string, company: string) => void
 }
 
 type JobSource = 'all' | 'linkedin' | 'indeed' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'momproject' | 'usajobs' | 'remoteok' | 'curated'
 
-export default function JobDiscoveryDashboard({ resumeContent, selectedResumeName }: JobDiscoveryDashboardProps) {
+export default function JobDiscoveryDashboard({ resumeContent, selectedResumeName, onTailorResume }: JobDiscoveryDashboardProps) {
   const [jobs, setJobs] = useState<JobWithScore[]>([])
   const [filteredJobs, setFilteredJobs] = useState<JobWithScore[]>([])
   const [selectedSource, setSelectedSource] = useState<JobSource>('all')
@@ -403,6 +404,20 @@ export default function JobDiscoveryDashboard({ resumeContent, selectedResumeNam
     }
   }
 
+  const handleTailorResume = (jobDescription: string, jobTitle: string, company: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (onTailorResume) {
+      onTailorResume(jobDescription, jobTitle, company)
+      setStatusMessage(`📝 Tailoring resume for ${jobTitle} at ${company}`)
+      setTimeout(() => setStatusMessage(''), 3000)
+    } else {
+      setStatusMessage('⚠️ Resume tailoring not available')
+      setTimeout(() => setStatusMessage(''), 3000)
+    }
+  }
+
   const handleSaveJob = (jobId: string, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -650,6 +665,14 @@ export default function JobDiscoveryDashboard({ resumeContent, selectedResumeNam
                       </div>
                     )}
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <button
+                        onClick={(e) => handleTailorResume(job.description, job.title, job.company, e)}
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-purple-300 border border-purple-500/30 rounded-lg hover:bg-purple-900/30 hover:text-purple-100 transition-all text-sm font-medium"
+                        title="Tailor Resume for This Job"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Tailor
+                      </button>
                       <button
                         onClick={(e) => handleSaveJob(job.id, e)}
                         className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-purple-300 border border-purple-500/30 rounded-lg hover:bg-purple-900/30 hover:text-purple-100 transition-all text-sm font-medium"

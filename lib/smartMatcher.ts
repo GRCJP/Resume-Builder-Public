@@ -346,9 +346,7 @@ export function enhanceResumeWithKeywords(
   missingKeywords: string[],
   jobDescription: string
 ): string {
-  // This will be used by the ResumeTailor to intelligently add missing keywords
-  // based on the user's actual experience
-  
+  // Generate concise, natural enhancements that integrate seamlessly
   const enhancements: string[] = []
   
   // Group missing keywords by category
@@ -363,39 +361,38 @@ export function enhanceResumeWithKeywords(
     }
   })
   
-  // Generate targeted enhancements based on categories
+  // Generate concise, natural enhancements
   if (missingByCategory['authorization']?.length > 0) {
-    enhancements.push(`
-AUTHORIZATION & COMPLIANCE EXPERIENCE:
-• Led FedRAMP Authorization to Operate (ATO) activities ensuring compliance with NIST 800-53 controls
-• Managed authorization packages and continuous monitoring requirements for federal systems
-• Coordinated with agency ISSOs and security teams to maintain authorization posture`)
+    enhancements.push('• Led FedRAMP ATO activities and continuous monitoring for federal systems')
   }
   
   if (missingByCategory['documentation']?.length > 0) {
-    enhancements.push(`
-SECURITY DOCUMENTATION EXPERTISE:
-• Developed and maintained System Security Plans (SSPs), POA&Ms, and Security Assessment Reports (SARs)
-• Created comprehensive security documentation aligned with NIST SP 800-37 RMF guidelines
-• Managed artifact lifecycle from initial development through continuous updates`)
+    enhancements.push('• Developed System Security Plans (SSPs), POA&Ms, and security assessment reports')
   }
   
   if (missingByCategory['framework']?.length > 0) {
-    const frameworks = missingByCategory['framework'].map(f => f.toUpperCase()).join(', ')
-    enhancements.push(`
-FRAMEWORK IMPLEMENTATION:
-• Applied ${frameworks} requirements to security control implementation and validation
-• Performed gap assessments and control mapping across multiple compliance frameworks
-• Supported audit preparation and evidence collection for framework compliance`)
+    const frameworks = missingByCategory['framework'].slice(0, 3).join(', ')
+    enhancements.push(`• Applied ${frameworks} requirements to security control implementation`)
   }
   
   if (missingByCategory['process']?.length > 0) {
-    enhancements.push(`
-SECURITY ASSESSMENT & MONITORING:
-• Conducted comprehensive security assessments and risk analyses for federal systems
-• Implemented continuous monitoring programs tracking control effectiveness and compliance posture
-• Performed vulnerability assessments and coordinated remediation activities`)
+    enhancements.push('• Conducted security assessments and implemented continuous monitoring programs')
   }
   
-  return enhancements.join('\n')
+  if (missingByCategory['risk']?.length > 0) {
+    enhancements.push('• Managed risk assessment programs and security control validation')
+  }
+  
+  if (missingByCategory['technical']?.length > 0) {
+    const techSkills = missingByCategory['technical'].slice(0, 2).join(', ')
+    enhancements.push(`• Utilized ${techSkills} for security operations and compliance monitoring`)
+  }
+  
+  if (missingByCategory['certification']?.length > 0) {
+    const certs = missingByCategory['certification'].slice(0, 2).join(', ')
+    enhancements.push(`• Maintained ${certs} certifications and related compliance expertise`)
+  }
+  
+  // Limit to 3-4 most impactful enhancements
+  return enhancements.slice(0, 4).join('\n')
 }

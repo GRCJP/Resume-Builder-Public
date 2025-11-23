@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Briefcase, Search, List } from 'lucide-react'
 import ResumeManager from '@/components/ResumeManager'
 import JobDiscoveryDashboard from '@/components/JobDiscoveryDashboard'
@@ -20,10 +20,23 @@ export default function Home() {
   const [resumes, setResumes] = useState<Resume[]>([])
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'discovery' | 'tracker'>('discovery')
+  const [jobDescriptionForTailoring, setJobDescriptionForTailoring] = useState<string>('')
 
   // Setup global error handlers for browser extension conflicts
   useEffect(() => {
     setupGlobalErrorHandlers()
+  }, [])
+
+  // Handle resume tailoring from job cards
+  const handleTailorResume = useCallback((jobDescription: string, jobTitle: string, company: string) => {
+    setJobDescriptionForTailoring(jobDescription)
+    // Switch to discovery tab to show resume manager
+    setActiveTab('discovery')
+    // Scroll to resume manager
+    setTimeout(() => {
+      const element = document.getElementById('resume-manager')
+      element?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
   }, [])
 
   // Load resumes from localStorage on mount
@@ -80,12 +93,13 @@ export default function Home() {
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Resume Management */}
-          <div className="mb-8">
+          <div className="mb-8" id="resume-manager">
             <ResumeManager 
               resumes={resumes}
               setResumes={setResumes}
               selectedResumeId={selectedResumeId}
               setSelectedResumeId={setSelectedResumeId}
+              jobDescription={jobDescriptionForTailoring}
             />
           </div>
 
@@ -121,6 +135,7 @@ export default function Home() {
               <JobDiscoveryDashboard
                 resumeContent={resumeContent}
                 selectedResumeName={selectedResume?.name || ''}
+                onTailorResume={handleTailorResume}
               />
             ) : (
               <ApplicationTracker />
