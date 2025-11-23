@@ -1,7 +1,7 @@
 # How to Build a Resume That Opens Doors
-*Industry Strategy for GRC Professionals*
+*By AJ - GRC Engineering Club*
 
-This guidance represents proven resume strategy principles that informed the development of the GRC Resume Builder tool.
+This guidance represents the proven resume strategy that informed the development of the GRC Resume Builder tool.
 
 ## The Resume Isn't a Biography, It's a Signal
 
@@ -135,4 +135,4 @@ This guidance transformed a 4-month job search with zero interviews into a strea
 
 ---
 
-*This strategy combines proven industry principles with practical implementation.*
+*Special thanks to AJ for providing the foundational guidance that made this tool possible.*
