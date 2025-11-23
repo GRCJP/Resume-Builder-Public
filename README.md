@@ -1,4 +1,4 @@
-# 🚀 GRC Job Search Engineering Platform — The Alex Chen Case Study
+# 🚀 GRC Job Search Engineering Platform — Portfolio Project
 
 **By Jonathan Perez — GRC Engineering • Career Development • ATS Optimization**
 
@@ -8,12 +8,12 @@ Job searching isn't guessing anymore — it's engineering. This portfolio projec
 
 ---
 
-## 🏛️ The Alex Chen Case Study — Why This Matters
+## 🏛️ The Problem & Solution — Why This Matters
 
-After 4 months of job applications with zero interviews, Alex Chen (fictional persona) transformed his approach using systematic engineering methods:
+After 4 months of job applications with zero interviews, I transformed my approach using systematic engineering methods:
 
 - **🚯 The Problem:** 4 months, 200+ applications, 0 interviews, $80 wasted on resume writer
-- **💡 The Breakthrough:** AJ's mentorship on "Signal, Not Biography" philosophy
+- **💡 The Breakthrough:** Applying "Signal, Not Biography" principles to job searching
 - **🛠️ The Solution:** Built comprehensive job search engineering platform
 - **🎯 The Results:** Multiple interview requests, better opportunities, systematic process
 
@@ -180,9 +180,7 @@ npm run dev
 
 ## 🤝 Community & Collaboration
 
-This portfolio project is the result of community, mentorship, and the desire to help GRC professionals transform their career search.
-
-**Huge shoutout to AJ** - whose guidance and feedback were instrumental in this journey. His mantra of "share the process" inspired this open approach.
+This portfolio project demonstrates how GRC engineering principles can solve real-world career challenges. Built from personal experience and refined through systematic testing.
 
 **Looking for collaborators:**
 - GRC professionals wanting to enhance the platform
@@ -192,9 +190,9 @@ This portfolio project is the result of community, mentorship, and the desire to
 
 ---
 
-## 📚 Foundational Guidance
+## 📚 Foundational Strategy
 
-This tool was built on AJ's guidance from the GRC Engineering Club. [Read the complete resume strategy that shaped this project](./docs/resume-guidance.md).
+This tool incorporates proven resume optimization strategies from industry experts. [Read the complete resume strategy that shaped this project](./documentation/resume-guidance.md).
 
 ---
 
