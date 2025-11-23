@@ -252,7 +252,45 @@ export default function JobDiscoveryDashboard({ resumeContent, selectedResumeNam
     e.preventDefault()
     e.stopPropagation()
     updateJobStatus(jobId, 'applied')
-    window.open(url, '_blank', 'noopener,noreferrer')
+    
+    // Validate URL
+    if (!url || !url.startsWith('http')) {
+      setStatusMessage('⚠️ Invalid job URL. Please copy and search manually.')
+      setTimeout(() => setStatusMessage(''), 3000)
+      return
+    }
+    
+    // Handle browser extension conflicts when opening new window
+    try {
+      const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
+      // Check if window was blocked by popup blocker
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        throw new Error('Popup blocked')
+      }
+    } catch (error) {
+      console.error('Browser extension conflict or popup blocker detected')
+      setStatusMessage('🔗 Browser blocked popup. Copy URL: ' + url)
+      setTimeout(() => setStatusMessage(''), 5000)
+      
+      // Fallback: create a temporary link and click it
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } catch (fallbackError) {
+        console.error('Fallback method also failed:', fallbackError)
+        // Last resort: copy to clipboard
+        navigator.clipboard.writeText(url).then(() => {
+          setStatusMessage('📋 URL copied to clipboard! Paste in new tab.')
+        }).catch(() => {
+          setStatusMessage('🔗 Manual access needed: ' + url)
+        })
+      }
+    }
   }
 
   const handleClearNew = () => {
