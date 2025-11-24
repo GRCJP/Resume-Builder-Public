@@ -133,13 +133,67 @@ ENHANCED SECURITY OPERATIONS EXPERIENCE:
 • Developed security monitoring use cases and alert tuning to reduce false positives`)
     }
     
-    // Combine original resume with enhancements
-    const tailored = `${enhanced}
-
----
-ADDITIONAL RELEVANT EXPERIENCE & CAPABILITIES
----
-${enhancements.join('\n')}`
+    // Combine original resume with enhancements while preserving formatting
+    let tailored = enhanced
+    
+    // Smart integration: Add enhancements to relevant existing sections
+    const lines = tailored.split('\n')
+    let insertPosition = lines.length
+    
+    // Find the best place to insert enhancements while preserving structure
+    let foundExperienceSection = false
+    let foundSkillsSection = false
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim().toUpperCase()
+      
+      // Track if we've passed key sections
+      if (line.match(/^(EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|CAREER|EMPLOYMENT)/)) {
+        foundExperienceSection = true
+        continue
+      }
+      
+      if (line.match(/^(SKILLS|TECHNICAL SKILLS|COMPETENCIES|EXPERTISE)/)) {
+        foundSkillsSection = true
+        continue
+      }
+      
+      // Insert after experience but before skills/education/certs
+      if (foundExperienceSection && !foundSkillsSection && 
+          (line.match(/^(EDUCATION|CERTIFICATIONS|PROJECTS|ADDITIONAL|REFERENCES|SKILLS)/) || 
+           (line === '' && i < lines.length - 1 && lines[i+1].trim().match(/^(EDUCATION|CERTIFICATIONS|PROJECTS|ADDITIONAL|REFERENCES|SKILLS)/)))) {
+        insertPosition = i
+        break
+      }
+    }
+    
+    // If we didn't find a good spot, insert at the very end before education/certs
+    if (insertPosition === lines.length) {
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim().toUpperCase()
+        if (line.match(/^(EDUCATION|CERTIFICATIONS|REFERENCES)/)) {
+          insertPosition = i
+          break
+        }
+      }
+    }
+    
+    // Insert enhancements at the optimal position with minimal formatting disruption
+    if (enhancements.length > 0) {
+      const enhancementText = enhancements.join('\n')
+      
+      // Check if there's already a similar section to avoid duplication
+      const hasEnhancedSection = lines.some(line => 
+        line.trim().toUpperCase().includes('ENHANCED') || 
+        line.trim().toUpperCase().includes('ADDITIONAL RELEVANT')
+      )
+      
+      if (!hasEnhancedSection) {
+        // Add minimal formatting to integrate seamlessly
+        lines.splice(insertPosition, 0, '', 'ENHANCED RELEVANT EXPERIENCE', enhancementText)
+        tailored = lines.join('\n')
+      }
+    }
     
     setTailoredResume(tailored)
     
@@ -215,6 +269,10 @@ ${enhancements.join('\n')}`
             </h3>
             <p className="text-sm text-gray-600 mt-1">
               Generate ATS-ready DOCX tailored for this specific job
+            </p>
+            <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Original formatting and structure preserved
             </p>
           </div>
           {!tailoredResume && (

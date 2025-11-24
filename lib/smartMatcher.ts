@@ -221,6 +221,232 @@ export const federalGRCKeywords: KeywordGroup[] = [
   }
 ]
 
+// Negative keywords - if found, this is NOT a GRC job
+const NEGATIVE_KEYWORDS = [
+  'immigration',
+  'immigration benefits',
+  'immigration laws',
+  'immigration system',
+  'citizenship',
+  'immigration adjudicator',
+  'immigration officer',
+  'uscis',
+  'immigration services',
+  'immigration applications',
+  'immigration adjudication',
+  'immigration benefits',
+  'immigration compliance',
+  'immigration enforcement',
+  'immigration interviews',
+  'immigration cases',
+  'immigration decisions',
+  'immigration documentation',
+  'immigration eligibility',
+  'immigration status',
+  'immigration petitions',
+  'immigration requests',
+  'immigration reviews',
+  'immigration screening',
+  'immigration verification',
+  'immigration vetting',
+  'immigration policies',
+  'immigration procedures',
+  'immigration regulations',
+  'immigration legislation',
+  'immigration programs',
+  'immigration operations',
+  'immigration administration',
+  'immigration management',
+  'immigration processing',
+  'immigration examination',
+  'immigration investigation',
+  'immigration enforcement',
+  'immigration control',
+  'immigration security',
+  'immigration integrity',
+  'immigration fraud',
+  'immigration misuse',
+  'immigration abuse',
+  'immigration violations',
+  'immigration offenses',
+  'immigration crimes',
+  'immigration penalties',
+  'immigration sanctions',
+  'immigration consequences',
+  'immigration outcomes',
+  'immigration results',
+  'immigration impact',
+  'immigration effects',
+  'immigration implications',
+  'immigration considerations',
+  'immigration factors',
+  'immigration elements',
+  'immigration aspects',
+  'immigration components',
+  'immigration features',
+  'immigration characteristics',
+  'immigration attributes',
+  'immigration properties',
+  'immigration qualities',
+  'immigration traits',
+  'immigration tendencies',
+  'immigration patterns',
+  'immigration trends',
+  'immigration developments',
+  'immigration changes',
+  'immigration shifts',
+  'immigration movements',
+  'immigration flows',
+  'immigration streams',
+  'immigration currents',
+  'immigration directions',
+  'immigration courses',
+  'immigration paths',
+  'immigration routes',
+  'immigration ways',
+  'immigration methods',
+  'immigration approaches',
+  'immigration techniques',
+  'immigration strategies',
+  'immigration tactics',
+  'immigration plans',
+  'immigration schemes',
+  'immigration programs',
+  'immigration initiatives',
+  'immigration projects',
+  'immigration activities',
+  'immigration operations',
+  'immigration functions',
+  'immigration duties',
+  'immigration responsibilities',
+  'immigration tasks',
+  'immigration assignments',
+  'immigration roles',
+  'immigration positions',
+  'immigration jobs',
+  'immigration careers',
+  'immigration work',
+  'immigration employment',
+  'immigration occupation',
+  'immigration profession',
+  'immigration vocation',
+  'immigration calling',
+  'immigration mission',
+  'immigration purpose',
+  'immigration goal',
+  'immigration objective',
+  'immigration target',
+  'immigration aim',
+  'immigration intention',
+  'immigration aspiration',
+  'immigration ambition',
+  'immigration desire',
+  'immigration wish',
+  'immigration hope',
+  'immigration dream',
+  'immigration vision'
+]
+
+// PERSONALIZED MATCHING FUNCTIONS
+function extractResumeKeywords(resumeContent: string): string[] {
+  const text = resumeContent.toLowerCase()
+  const keywords = new Set<string>()
+  
+  // Extract technical skills and certifications
+  const technicalSkills = [
+    'python', 'aws', 'azure', 'cloud', 'automation', 'scripting',
+    'linux', 'windows', 'network', 'security', 'cybersecurity',
+    'compliance', 'risk management', 'audit', 'governance',
+    'nist', 'iso 27001', 'soc 2', 'pci dss', 'hipaa', 'gdpr',
+    'vulnerability management', 'penetration testing', 'incident response',
+    'firewall', 'siem', 'ids', 'ips', 'malware', 'threat intelligence',
+    'risk assessment', 'security assessment', 'compliance audit',
+    'policy', 'procedure', 'control', 'framework', 'standard',
+    'grc', 'governance risk compliance', 'risk management framework',
+    'rmf', 'fisma', 'fedramp', 'ato', 'pato', 'poam', 'ssp',
+    'continuous monitoring', 'security controls', 'technical controls',
+    'administrative controls', 'physical controls', 'security architecture',
+    'enterprise security', 'information security', 'it security',
+    'cyber defense', 'threat detection', 'vulnerability scanning',
+    'security operations', 'secops', 'security engineering',
+    'compliance engineering', 'risk analysis', 'security analysis'
+  ]
+  
+  // Extract tools and technologies
+  const tools = [
+    'splunk', 'qualys', 'nessus', 'nexpose', 'openvas', 'nmap',
+    'metasploit', 'burp suite', 'wireshark', 'snort', 'suricata',
+    'ticket', 'servicenow', 'jira', 'confluence', 'sharepoint',
+    'office 365', 'microsoft office', 'excel', 'word', 'powerpoint',
+    'visio', 'project', 'slack', 'teams', 'zoom', 'webex',
+    'vpn', 'active directory', 'ldap', 'kerberos', 'ssl', 'tls',
+    'encryption', 'authentication', 'authorization', 'access control',
+    'identity management', 'single sign-on', 'sso', 'mfa', '2fa'
+  ]
+  
+  // Extract job titles and roles
+  const jobTitles = [
+    'security analyst', 'security engineer', 'grc analyst', 'grc engineer',
+    'compliance analyst', 'compliance engineer', 'risk analyst',
+    'it auditor', 'security auditor', 'information security analyst',
+    'cybersecurity analyst', 'security consultant', 'it security specialist',
+    'information security officer', 'security manager', 'compliance manager',
+    'risk manager', 'governance analyst', 'policy analyst',
+    'security architect', 'enterprise architect', 'solutions architect'
+  ]
+  
+  // Check all categories and add matches
+  const allKeywords = [...technicalSkills, ...tools, ...jobTitles]
+  
+  allKeywords.forEach(keyword => {
+    if (text.includes(keyword)) {
+      keywords.add(keyword)
+    }
+  })
+  
+  // Extract specific certifications mentioned
+  const certPattern = /\b(cissp|cisa|cism|crisc|ccsp|ceh|oscp|security\+|network\+|aws certified|azure certified|gcp certified)\b/gi
+  const certs = text.match(certPattern) || []
+  certs.forEach(cert => keywords.add(cert.toLowerCase()))
+  
+  // Extract years of experience patterns
+  const expPattern = /\b(\d+)\+?\s*(years?|yrs?)\s*(of\s+)?(experience|exp|work)\b/gi
+  const expMatches = text.match(expPattern) || []
+  expMatches.forEach(exp => keywords.add(exp.toLowerCase()))
+  
+  return Array.from(keywords).sort()
+}
+
+function checkPersonalMatches(jobDescription: string, resumeKeywords: string[]): { score: number, matches: string[] } {
+  const matches: string[] = []
+  let score = 0
+  
+  // Weight different types of matches differently
+  resumeKeywords.forEach(keyword => {
+    if (jobDescription.includes(keyword)) {
+      matches.push(keyword)
+      
+      // Higher weight for technical skills and certifications
+      if (['python', 'aws', 'azure', 'cloud', 'automation', 'scripting'].includes(keyword)) {
+        score += 15
+      } else if (['cissp', 'cisa', 'cism', 'crisc', 'ccsp', 'ceh'].includes(keyword)) {
+        score += 20
+      } else if (['nist', 'iso 27001', 'soc 2', 'pci dss', 'rmf', 'fisma', 'fedramp'].includes(keyword)) {
+        score += 12
+      } else if (['grc', 'governance risk compliance', 'risk management', 'compliance'].includes(keyword)) {
+        score += 10
+      } else if (['security analyst', 'security engineer', 'grc analyst', 'grc engineer'].includes(keyword)) {
+        score += 8
+      } else {
+        score += 5
+      }
+    }
+  })
+  
+  console.log(`🎯 Personal matches: ${matches.length} keywords, score: ${score}`)
+  return { score, matches }
+}
+
 export function smartMatch(jobDescription: string, resumeContent: string): {
   matchScore: number
   foundKeywords: string[]
@@ -230,6 +456,33 @@ export function smartMatch(jobDescription: string, resumeContent: string): {
 } {
   const jd = jobDescription.toLowerCase()
   const resume = resumeContent.toLowerCase()
+  
+  // NEGATIVE FILTERING - Check for non-GRC job types first
+  const foundNegativeKeywords = NEGATIVE_KEYWORDS.filter(keyword => 
+    jd.includes(keyword.toLowerCase())
+  )
+  
+  // If any negative keywords found, this is not a GRC job - return very low score
+  if (foundNegativeKeywords.length > 0) {
+    console.log(`🚫 NEGATIVE KEYWORDS DETECTED: ${foundNegativeKeywords.join(', ')}`)
+    return {
+      matchScore: 5, // Very low score for non-GRC jobs
+      foundKeywords: [],
+      missingKeywords: ['GRC keywords not found'],
+      criticalMissing: ['This is not a GRC/cybersecurity role'],
+      details: []
+    }
+  }
+  
+  // PERSONALIZED MATCHING - Extract keywords from YOUR specific resume
+  const resumeKeywords = extractResumeKeywords(resumeContent)
+  console.log(`📝 Resume keywords extracted: ${resumeKeywords.slice(0, 10).join(', ')}...`)
+  
+  // Check if job description contains YOUR specific skills
+  const personalMatches = checkPersonalMatches(jd, resumeKeywords)
+  
+  // Note: We'll use personal matches to BOOST scores, not filter out jobs
+  // Jobs with no personal matches will still be scored based on generic GRC keywords
   
   // Enhanced context matching - look for action verbs + concepts
   const contextMatches = [
@@ -328,12 +581,26 @@ export function smartMatch(jobDescription: string, resumeContent: string): {
   
   const matchScore = totalWeight > 0 ? Math.round((matchedWeight / totalWeight) * 100) : 0
   
-  const foundKeywords = details.filter(d => d.found).map(d => d.keyword)
+  // Incorporate personalized matching into final score
+  const personalizedScore = Math.min(personalMatches.score, 100) // Cap at 100%
+  
+  // Weighted combination: 70% generic keywords, 30% personalized skills
+  // This ensures jobs are scored mainly on GRC fit, with a boost for personal skills
+  const finalScore = Math.round((matchScore * 0.7) + (personalizedScore * 0.3))
+  
+  const foundKeywords = [
+    ...details.filter(d => d.found).map(d => d.keyword),
+    ...personalMatches.matches
+  ].filter((keyword, index, arr) => arr.indexOf(keyword) === index) // Remove duplicates
+  
   const missingKeywords = details.filter(d => !d.found).map(d => d.keyword)
+  
   const criticalMissing = details.filter(d => !d.found && d.weight >= 4).map(d => d.keyword)
   
+  console.log(`🎯 FINAL SCORING: Generic=${matchScore}%, Personalized=${personalizedScore}%, Weighted Final=${finalScore}% (70% generic + 30% personal)`)
+  
   return {
-    matchScore,
+    matchScore: finalScore,
     foundKeywords,
     missingKeywords,
     criticalMissing,

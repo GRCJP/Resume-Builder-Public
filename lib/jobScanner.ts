@@ -7,7 +7,7 @@ export interface JobPosting {
   location: string
   description: string
   url: string
-  source: 'indeed' | 'linkedin' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'other' | 'curated'
+  source: 'indeed' | 'linkedin' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'other' | 'curated' | 'adzuna' | 'serpapi' | 'usajobs' | 'emailAlerts' | 'jsearch'
   postedDate: string
   matchScore: number
   salary?: string
@@ -19,8 +19,18 @@ export interface ScanResult {
   totalFound: number
   highMatches: JobPosting[] // 90%+
   goodMatches: JobPosting[] // 75-89%
+  fairMatches: JobPosting[] // 50-74%
   lastScanTime: string
   nextScanTime: string
+  pipelineStats?: {
+    phase1Raw: number
+    phase2Filtered: number
+    phase3Scored: number
+    phase4Verified: number
+    phase5Final: number
+    sourceBreakdown: Record<string, number>
+    scoreDistribution: Record<string, number>
+  }
 }
 
 export interface ScanConfig {
@@ -30,6 +40,16 @@ export interface ScanConfig {
   minMatchScore: number
   sources: string[]
   scanIntervalHours: number
+  mockMode?: boolean // Optional mock mode for testing
+  // API configuration options
+  linkedinPages?: number
+  indeedPages?: number
+  maxQueriesPerSource?: number
+  includeAdzuna?: boolean
+  includeSerpApi?: boolean
+  includeJSearch?: boolean
+  includeUSAJobs?: boolean
+  includeEmailAlerts?: boolean
 }
 
 /**
@@ -54,7 +74,7 @@ export const defaultScanConfig: ScanConfig = {
   ],
   remote: true,
   minMatchScore: 75,
-  sources: ['linkedin', 'indeed', 'dice', 'ziprecruiter', 'glassdoor', 'momproject', 'usajobs'],
+  sources: ['linkedin', 'indeed', 'dice', 'ziprecruiter', 'glassdoor', 'momproject', 'usajobs', 'emailAlerts'],
   scanIntervalHours: 6
 }
 
@@ -100,68 +120,292 @@ export const jobBoardAPIs = {
  * Scan job boards for matching positions
  * Note: This is a framework - actual implementation requires API keys
  */
-export async function scanJobBoards(
-  resumeContent: string,
-  config: ScanConfig = defaultScanConfig
-): Promise<ScanResult> {
-  const results: JobPosting[] = []
+export async function scanJobBoards(resumeContent: string, location: string, config: Partial<ScanConfig> = {}): Promise<ScanResult> {
+  const { minMatchScore = 50 } = config
   
-  // In production, this would call actual APIs
-  // For now, this is a framework showing how it would work
+  console.log('🚀 Starting job board scan with clean pipeline...')
+  console.log(`📍 Location: ${location}`)
+  console.log(`📝 Resume content length: ${resumeContent.length} characters`)
   
-  console.log('🔍 Scanning job boards...')
-  console.log(`Keywords: ${config.keywords.join(', ')}`)
-  console.log(`Sources: ${config.sources.join(', ')}`)
+  try {
+    // Use the new clean pipeline
+    const { cleanJobScanPipeline } = await import('./cleanPipeline')
+    const pipelineResults = await cleanJobScanPipeline(resumeContent, location)
+    
+    console.log('✅ Clean pipeline completed successfully')
+    console.log(`📊 Pipeline stats:`, pipelineResults.pipelineStats)
+    
+    // Return results in the expected ScanResult format
+    return {
+      totalFound: pipelineResults.allJobs.length,
+      highMatches: pipelineResults.highMatches,
+      goodMatches: pipelineResults.goodMatches,
+      fairMatches: pipelineResults.fairMatches,
+      lastScanTime: new Date().toISOString(),
+      nextScanTime: new Date(Date.now() + (config.scanIntervalHours || 24) * 60 * 60 * 1000).toISOString(),
+      pipelineStats: pipelineResults.pipelineStats // Add pipeline stats for debugging
+    }
+    
+  } catch (error) {
+    console.error('❌ Clean pipeline failed:', error)
+    
+    // Fallback to old method if pipeline fails
+    console.log('🔄 Falling back to legacy scan method...')
+    return await legacyScanJobBoards(resumeContent, location, config)
+  }
+}
+
+/**
+ * Legacy scan method (fallback)
+ */
+async function legacyScanJobBoards(resumeContent: string, location: string, config: Partial<ScanConfig> = {}): Promise<ScanResult> {
+  const { minMatchScore = 50 } = config
   
-  // Scan each source
-  for (const source of config.sources) {
-    try {
-      const jobs = await scanSource(source, config)
-      
-      // Score each job against resume
-      for (const job of jobs) {
-        if (!job.description || !job.id) continue
-        
-        const score = await scoreJobMatch(job.description, resumeContent)
-        
-        if (score >= config.minMatchScore) {
-          results.push({
-            id: job.id,
-            title: job.title || 'Unknown Title',
-            company: job.company || 'Unknown Company',
-            location: job.location || 'Unknown Location',
-            description: job.description,
-            url: job.url || '',
-            source: (job.source as any) || 'other',
-            postedDate: job.postedDate || new Date().toISOString(),
-            matchScore: score,
-            salary: job.salary,
-            remote: job.remote,
-            scannedAt: new Date().toISOString()
-          })
-        }
+  console.log('🔍 Starting job board scan...')
+  console.log(`📝 Resume content length: ${resumeContent.length}`)
+  console.log(`📍 Location: ${location}`)
+  console.log(`📊 Full config:`, config)
+  
+  // MOCK MODE: Return realistic mock data immediately
+  if (config.mockMode) {
+    console.log('🎭 MOCK MODE: Returning realistic mock scan results')
+    
+    const mockJobs = [
+      {
+        id: 'mock-1',
+        title: 'Senior GRC Analyst',
+        company: 'Defense Information Systems Agency',
+        location: 'Washington DC',
+        url: 'https://www.usajobs.gov/job/12345',
+        source: 'other' as const, // Use valid JobPosting source type
+        description: 'Senior GRC Analyst position responsible for compliance management and risk assessment...',
+        postedDate: new Date().toISOString(),
+        matchScore: 95,
+        scannedAt: new Date().toISOString()
+      },
+      {
+        id: 'mock-2', 
+        title: 'Cybersecurity Compliance Manager',
+        company: 'Booz Allen Hamilton',
+        location: 'Remote',
+        url: 'https://boozallen.com/careers/67890',
+        source: 'other' as const, // Use valid JobPosting source type
+        description: 'Leading cybersecurity compliance initiatives for federal clients...',
+        postedDate: new Date().toISOString(),
+        matchScore: 88,
+        scannedAt: new Date().toISOString()
+      },
+      {
+        id: 'mock-3',
+        title: 'FedRAMP Compliance Engineer',
+        company: 'Accenture Federal Services',
+        location: 'Arlington, VA',
+        url: 'https://accenture.com/federal/careers/11111',
+        source: 'other' as const, // Use valid JobPosting source type
+        description: 'FedRAMP compliance engineering role working with cloud security frameworks...',
+        postedDate: new Date().toISOString(),
+        matchScore: 82,
+        scannedAt: new Date().toISOString()
       }
-    } catch (error) {
-      console.error(`Error scanning ${source}:`, error)
+    ]
+    
+    // Score and categorize mock jobs
+    const highMatches = mockJobs.filter(job => job.matchScore >= 90)
+    const goodMatches = mockJobs.filter(job => job.matchScore >= 75 && job.matchScore < 90)
+    const fairMatches = mockJobs.filter(job => job.matchScore >= (config.minMatchScore || 50) && job.matchScore < 75)
+    
+    return {
+      totalFound: mockJobs.length,
+      highMatches,
+      goodMatches,
+      fairMatches,
+      lastScanTime: new Date().toISOString(),
+      nextScanTime: new Date(Date.now() + (config.scanIntervalHours || 24) * 60 * 60 * 1000).toISOString()
+    }
+  }
+    
+  // Normal API flow (when not in mock mode)
+  const { searchAllJobBoards } = await import('./jobBoardIntegrations')
+  const { smartMatch } = await import('./smartMatcher')
+  
+  const jobs = await searchAllJobBoards(resumeContent, location || 'Remote', {
+    linkedinPages: 6,        // Increased from 2
+    indeedPages: 6,         // Increased from 2  
+    includeUSAJobs: true,
+    maxQueriesPerSource: 8,  // Balanced for speed and coverage
+    includeAdzuna: true,      // ENABLED - working in email pipeline
+    includeSerpApi: true,     // ENABLED - confirmed functional
+    includeJSearch: true,       // ENABLED - working again
+    includeEmailAlerts: true  // ENABLED - email job fetching
+  })
+  
+  console.log(`✅ Job board search completed: ${jobs.length} raw jobs collected`)
+  
+  // Fetch jobs from email alerts (Lensa, LinkedIn, Indeed, etc.) - ENABLED
+  let emailJobs: any[] = []
+  console.log('📧 Fetching jobs from email alerts...')
+  
+  try {
+    console.log('📧 Connecting to Gmail to fetch job alert emails...')
+    const { gmailFetcher } = await import('./gmailFetcher')
+    
+    // Note: This will require OAuth2 setup to work properly
+    // For now, we'll try to fetch but handle gracefully if not configured
+    emailJobs = await gmailFetcher.extractJobsFromEmails(7) // Last 7 days
+    console.log(`✅ Email job fetch completed: ${emailJobs.length} jobs from emails`)
+  } catch (emailError) {
+    console.log('⚠️ Email job fetch failed (this is expected if Gmail OAuth not configured):', emailError)
+    console.log('💡 To enable email job fetching, set up Gmail OAuth2 credentials')
+    // Continue without email jobs - this is optional
+  }
+  
+  // Combine API jobs and email jobs
+  const allJobs = [...jobs, ...emailJobs]
+  console.log(`📊 Total jobs collected: ${allJobs.length} (${jobs.length} from APIs + ${emailJobs.length} from emails)`)
+  
+  // TRUTH TEST: Check if jobs have real descriptions before scoring
+  console.log(
+    "🔍 JOB SAMPLE BEFORE SCORING:",
+    allJobs.slice(0, 3).map((j: any) => ({
+      title: j.title,
+      source: j.source,
+      url: j.url,
+      descLen: j.description?.length || 0,
+      verifiedAt: j.verifiedAt,
+      linkStatus: j.linkStatus
+    }))
+  )
+  
+  console.log('🎯 Starting job scoring...')
+  
+  // Import and score jobs (only after description enrichment)
+  const scoredJobs = allJobs.map((job: any) => {
+    const matchResult = smartMatch(job.description || '', resumeContent)
+    
+    // Log scoring comparison for USAJobs
+    if (job.source === 'other' && job.url?.includes('usajobs.gov')) {
+      console.log(`🔍 USAJobs Scoring Comparison: ${job.title}`)
+      console.log(`  - Search Score: ${job.matchScore || 'N/A'}%`)
+      console.log(`  - ATS Score: ${matchResult.matchScore}%`)
+      console.log(`  - Description Length: ${job.description?.length || 0} chars`)
+      console.log(`  - Found Keywords: ${matchResult.foundKeywords.length}`)
+      console.log(`  - Missing Keywords: ${matchResult.missingKeywords.length}`)
+    }
+    
+    return {
+      id: job.id || `job-${Date.now()}-${Math.random()}`,
+      title: job.title || 'Unknown Title',
+      company: job.company || 'Unknown Company',
+      location: job.location || 'Unknown Location',
+      description: job.description || '',
+      url: job.url || '',
+      source: job.source || 'other',
+      postedDate: job.postedDate || new Date().toISOString(),
+      matchScore: matchResult.matchScore,
+      matchReasons: matchResult.foundKeywords,
+      salary: job.salary,
+      remote: job.remote,
+      scannedAt: new Date().toISOString()
+    }
+  })
+  
+  console.log(`✅ Job scoring completed: ${scoredJobs.length} jobs scored`)
+  
+  // DEBUG: Track source breakdown after scoring
+  const sourcesAfterScoring = scoredJobs.reduce((acc: Record<string, number>, job: any) => {
+    acc[job.source] = (acc[job.source] || 0) + 1
+    return acc
+  }, {})
+  console.log(`📊 Source breakdown after scoring:`, sourcesAfterScoring)
+  
+  // Filter by score bands and minimum relevance
+  const highMatches = scoredJobs.filter((job: any) => (job.matchScore ?? 0) >= 90)
+  const goodMatches = scoredJobs.filter((job: any) => (job.matchScore ?? 0) >= 75 && (job.matchScore ?? 0) < 90)
+  const fairMatches = scoredJobs.filter((job: any) => (job.matchScore ?? 0) >= 30 && (job.matchScore ?? 0) < 75) // Increased from config.minMatchScore
+  
+  // DEBUG: Track source breakdown in each bucket
+  const highSources = highMatches.reduce((acc: Record<string, number>, job: any) => {
+    acc[job.source] = (acc[job.source] || 0) + 1
+    return acc
+  }, {})
+  const goodSources = goodMatches.reduce((acc: Record<string, number>, job: any) => {
+    acc[job.source] = (acc[job.source] || 0) + 1
+    return acc
+  }, {})
+  const fairSources = fairMatches.reduce((acc: Record<string, number>, job: any) => {
+    acc[job.source] = (acc[job.source] || 0) + 1
+    return acc
+  }, {})
+  
+  console.log(`📊 HIGH MATCHES (90%+): ${highMatches.length} jobs`, highSources)
+  console.log(`📊 GOOD MATCHES (75-89%): ${goodMatches.length} jobs`, goodSources)
+  console.log(`📊 FAIR MATCHES (30-74%): ${fairMatches.length} jobs`, fairSources)
+  
+  // Filter out completely irrelevant jobs (score < 30)
+  const irrelevantJobs = scoredJobs.filter((job: any) => (job.matchScore ?? 0) < 30)
+  
+  console.log('📊 Score distribution:', {
+    total: scoredJobs.length,
+    high: highMatches.length,
+    good: goodMatches.length,
+    fair: fairMatches.length,
+    irrelevant: irrelevantJobs.length,
+    threshold: 30
+  })
+  
+  if (irrelevantJobs.length > 0) {
+    console.log(`❌ Filtered out ${irrelevantJobs.length} irrelevant jobs (score < 30):`)
+    console.log(`  Sample irrelevant jobs:`, irrelevantJobs.slice(0, 3).map(j => ({
+      title: j.title,
+      company: j.company,
+      score: j.matchScore
+    })))
+  }
+  
+  // EMAIL ALERTS: Send email if high matches found and email configured
+  if ((highMatches.length > 0 || goodMatches.length > 0) && process.env.JOBS_EMAIL_USER) {
+    try {
+      const emailJobs = [...highMatches, ...goodMatches]
+      const emailResponse = await fetch('/api/email-alerts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobs: emailJobs,
+          subject: `🎯 ${emailJobs.length} New Job Matches Found - ${new Date().toLocaleDateString()}`
+        })
+      })
+      
+      if (emailResponse.ok) {
+        const emailResult = await emailResponse.json()
+        console.log('✅ Email alerts sent successfully:', emailResult.messageId)
+      } else {
+        const error = await emailResponse.text()
+        console.error('❌ Email alerts failed:', error)
+      }
+    } catch (emailError) {
+      console.error('❌ Email alert error:', emailError)
+    }
+  } else {
+    if (!process.env.JOBS_EMAIL_USER) {
+      console.log('📧 Email alerts not configured (set JOBS_EMAIL_USER environment variable)')
+    } else {
+      console.log('📧 No high-quality matches for email alerts')
     }
   }
   
-  // Sort by match score
-  results.sort((a, b) => b.matchScore - a.matchScore)
-  
-  const highMatches = results.filter(j => j.matchScore >= 90)
-  const goodMatches = results.filter(j => j.matchScore >= 75 && j.matchScore < 90)
-  
-  const now = new Date()
-  const nextScan = new Date(now.getTime() + config.scanIntervalHours * 60 * 60 * 1000)
-  
-  return {
-    totalFound: results.length,
+  const result: ScanResult = {
+    totalFound: scoredJobs.length,
     highMatches,
     goodMatches,
-    lastScanTime: now.toISOString(),
-    nextScanTime: nextScan.toISOString()
+    fairMatches,
+    lastScanTime: new Date().toISOString(),
+    nextScanTime: new Date(Date.now() + (config.scanIntervalHours || 24) * 60 * 60 * 1000).toISOString()
   }
+  
+  console.log('✅ Job scan completed successfully')
+  return result
 }
 
 /**
@@ -185,6 +429,7 @@ async function scanSource(source: string, config: ScanConfig): Promise<Partial<J
     const { searchUSAJobs } = await import('./usajobsAPI')
     
     const location = config.locations[0] || 'Remote'
+    // Keep keywords as array for function calls that expect array
     
     switch (source.toLowerCase()) {
       case 'linkedin':
@@ -204,11 +449,11 @@ async function scanSource(source: string, config: ScanConfig): Promise<Partial<J
       
       case 'momproject':
       case 'the mom project':
-        return await searchMomProjectJobs(config.keywords)
+        return await searchMomProjectJobs(config.keywords, location)
       
       case 'usajobs':
         const usaJobs = await searchUSAJobs({
-          keyword: config.keywords.join(' OR '),
+          keyword: config.keywords.join(' OR '), // USAJobs expects string
           location,
           remote: config.remote,
           resultsPerPage: 50
@@ -220,14 +465,14 @@ async function scanSource(source: string, config: ScanConfig): Promise<Partial<J
           location: job.location,
           description: job.description,
           url: job.url,
-          source: 'usajobs' as any,
-          postedDate: job.posted,
-          salary: `$${job.salary.min.toLocaleString()} - $${job.salary.max.toLocaleString()}`,
-          remote: job.remote
+          source: 'other' as const, // Use valid JobPosting source type
+          postedDate: job.postedDate,
+          matchScore: 0,
+          scannedAt: new Date().toISOString()
         }))
       
       case 'all':
-        return await searchAllJobBoards(config.keywords, location)
+        return await searchAllJobBoards(config.keywords.join(' OR '), location, {})
       
       default:
         console.warn(`Unknown source: ${source}`)

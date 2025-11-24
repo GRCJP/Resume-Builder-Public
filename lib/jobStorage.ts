@@ -8,10 +8,14 @@ export interface JobWithScore extends JobPosting {
   score?: number
   isNew?: boolean
   analyzedAt?: string
+  scannedAt: string
   status?: ApplicationStatus
   notes?: string
   appliedDate?: string
   lastUpdated?: string
+  verifiedAt?: string
+  linkStatus?: number
+  requiresLogin?: boolean
 }
 
 export interface JobStorage {
@@ -220,7 +224,11 @@ export function markNewJobs(jobs: JobPosting[], source: string): JobWithScore[] 
   
   if (!lastSeen) {
     // First visit - all jobs are "new" but don't mark them
-    return jobs.map(job => ({ ...job, isNew: false }))
+    return jobs.map(job => ({ 
+      ...job, 
+      isNew: false,
+      scannedAt: job.scannedAt || new Date().toISOString()
+    }))
   }
   
   const lastSeenDate = new Date(lastSeen)
@@ -228,7 +236,11 @@ export function markNewJobs(jobs: JobPosting[], source: string): JobWithScore[] 
   return jobs.map(job => {
     const postedDate = new Date(job.postedDate)
     const isNew = postedDate > lastSeenDate
-    return { ...job, isNew }
+    return { 
+      ...job, 
+      isNew,
+      scannedAt: job.scannedAt || new Date().toISOString()
+    }
   })
 }
 
