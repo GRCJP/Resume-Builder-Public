@@ -97,7 +97,7 @@ I wanted to share a portfolio project I built after struggling with my own job s
 
 This demonstrates how we can apply GRC engineering principles to career development.
 
-Based heavily on AJ's "Signal, Not Biography" guidance.
+Based on proven "Signal, Not Biography" guidance for GRC professionals.
 
 Would love feedback from fellow GRC engineers!
 
