@@ -103,6 +103,9 @@ Choose one or more:
 - **[🔌 API Setup Guide](./docs/getting-started/API_SETUP.md)** - Configure API integrations
 
 ### **📚 Additional Resources:**
+- **[🔌 Complete API Documentation](./docs/api/)** - Detailed API integration guides for all services
+- **[📚 Training Program](./docs/training/training-program.md)** - Complete 4-week training curriculum
+- **[📖 Documentation Hub](./docs/README.md)** - Complete documentation index
 - **[JSearch Setup](./JSEARCH_SETUP.md)** - Specific JSearch API integration guide
 - **[Project Documentation](./documentation/)** - In-depth project documentation
 

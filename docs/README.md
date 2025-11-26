@@ -26,11 +26,18 @@
 
 ## 🔌 API Documentation
 
-### **API integration guides:**
-- **[🇺🇸 USAJobs Integration](./api/usajobs.md)** - Federal job board setup
-- **[📧 Gmail Integration](./api/gmail.md)** - Email parsing setup
-- **[🔍 Job Board APIs](./api/job-boards.md)** - Multiple job board integrations
+### **Complete API Integration Guides:**
+- **[🔌 API Integration Guide](./api/api-integration-guide.md)** - Complete overview of all API integrations
+- **[🇺🇸 USAJobs API](./api/usajobs-api.md)** - Federal job board complete integration guide
+- **[📧 Gmail Integration](./api/gmail-api.md)** - Email parsing and OAuth setup
+- **[🔍 Job Board APIs](./api/job-board-apis.md)** - Adzuna, SerpApi, JSearch integrations
 - **[🔧 API Reference](./api/reference.md)** - Complete API documentation
+
+### **📚 Training & Learning:**
+- **[📚 Training Program](./training/training-program.md)** - Complete 4-week training curriculum
+- **[🎯 Lesson Plans](./training/lesson-plans.md)** - Detailed lesson plans and exercises
+- **[🛠️ Practical Projects](./training/projects.md)** - Hands-on project assignments
+- **[📋 Assessment Guide](./training/assessment.md)** - Knowledge checks and certification
 
 ---
 
