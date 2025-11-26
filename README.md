@@ -8,10 +8,13 @@ Transform your job search with AI-powered resume optimization, multi-board job d
 
 ## 🎯 What This Does
 
-### **📝 Resume Optimization**
-- **ATS Scoring** - Real-time resume analysis against industry standards
-- **Keyword Enhancement** - Automatic keyword integration for better matching
-- **Professional Formatting** - Clean, professional resume templates
+### **🎯 Industry-Standard ATS Scoring**
+- **Fortune 500 ATS Analysis** - Based on Taleo, Workday, iCIMS, Greenhouse
+- **GRC Specialized** - Optimized for Governance, Risk, Compliance roles
+- **30+ Scoring Criteria** - Parsing, content, and job matching analysis
+- **A-F Grade System** - Interview rate predictions (A=45-60% success rate)
+- **Federal Job Optimization** - Security clearance and government positions
+- **Real-time Feedback** - Immediate improvement recommendations
 - **One-Click Tailoring** - Instant resume customization for specific jobs
 
 ### **🔍 Job Discovery**

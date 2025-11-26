@@ -25,9 +25,16 @@ Visit `http://localhost:3000`
 
 **For Basic Features (No API Setup Needed):**
 - ✅ Resume upload and parsing
-- ✅ ATS scoring and optimization
+- ✅ **Industry-Standard ATS Scoring** - Based on Fortune 500 ATS systems
 - ✅ Resume tailoring suggestions
 - ✅ Application tracking
+
+**🎯 ATS Scoring Highlights:**
+- **Industry Standard** - Based on Taleo, Workday, iCIMS, Greenhouse analysis
+- **GRC-Focused** - Specialized for Governance, Risk, Compliance roles
+- **Comprehensive** - 30+ criteria across parsing, content, and job matching
+- **Grade System** - A-F grading with interview rate predictions
+- **Federal Jobs** - Security clearance and government position optimization
 
 **For Full Features (API Setup REQUIRED):**
 - 🔧 **Job Discovery** - USAJobs, JSearch, Adzuna, SerpApi

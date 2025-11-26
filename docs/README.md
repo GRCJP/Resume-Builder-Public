@@ -20,6 +20,7 @@
 - **[🛠️ Development Setup](../DEVELOPMENT.md)** - Complete development environment
 - **[🤝 Contributing Guidelines](../CONTRIBUTING.md)** - How to contribute effectively
 - **[📁 Project Structure](./development/project-structure.md)** - Code organization
+- **[🎯 ATS Scoring Model](./development/ats-scoring-model.md)** - Industry-standard scoring system
 - **[🧪 Testing Guide](./development/testing.md)** - Testing procedures
 - **[📋 Code Standards](./development/code-standards.md)** - Coding best practices
 
