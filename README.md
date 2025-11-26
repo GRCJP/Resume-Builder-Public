@@ -200,6 +200,7 @@ Help us democratize career advancement for GRC professionals. Whether you're:
 
 ### **🛠️ Development Resources:**
 - **[🛠️ Development Setup](./docs/development/development-setup.md)** - Complete development environment
+- **[🔄 Contributor Workflow](./docs/development/contributor-workflow.md)** - Step-by-step contribution guide
 - **[🤝 Contributing Guide](./docs/development/contributing-guide.md)** - How to contribute effectively
 - **[🎯 ATS Scoring Model](./docs/development/ats-scoring-model.md)** - Industry-standard scoring system
 
@@ -218,6 +219,57 @@ Help us democratize career advancement for GRC professionals. Whether you're:
 
 ---
 
+## 🤝 How to Contribute
+
+### **🚀 Quick Start Contributing (5 minutes)**
+```bash
+# 1. Fork the repository
+# Visit: https://github.com/GRCJP/Resume-Builder-Public → Click "Fork"
+
+# 2. Clone your fork
+git clone https://github.com/YOUR-USERNAME/Resume-Builder-Public.git
+cd Resume-Builder-Public
+
+# 3. Setup your environment
+npm install
+cp .env.example .env.local
+
+# 4. Configure APIs (20 minutes)
+# Follow: docs/getting-started/API-SETUP-CHECKLIST.md
+
+# 5. Start development
+npm run dev
+# Open http://localhost:3000 → Start contributing!
+```
+
+### **🔄 Complete Workflow**
+1. **Fork & Clone** - Create your own version
+2. **Setup APIs** - Configure your API keys (20-30 minutes)
+3. **Create Branch** - `git checkout -b feature/your-feature`
+4. **Make Changes** - Code, test, document
+5. **Submit PR** - Create pull request for review
+6. **Get Merged** - Community review and integration
+
+### **📋 What You Can Work On**
+- **🎨 Frontend** - UI improvements, new components, styling
+- **⚙️ Backend** - API integrations, performance improvements
+- **📚 Documentation** - Update guides, fix documentation, add tutorials
+- **🐛 Bug Fixes** - Resolve issues, improve error handling
+- **🧪 Testing** - Add tests, improve coverage, fix bugs
+
+### **🎯 First Contribution Ideas**
+- Fix a typo in documentation
+- Improve ATS scoring algorithm
+- Add new GRC keywords
+- Enhance resume preview UI
+- Add new API integration
+- Write a tutorial
+- Report and fix a bug
+
+**[🔄 Complete Contributor Workflow Guide](./docs/development/contributor-workflow.md)** - Step-by-step instructions
+
+---
+
 ## 🤝 Community
 
 This is a community-driven open source project. We welcome contributions from:
@@ -226,13 +278,6 @@ This is a community-driven open source project. We welcome contributions from:
 - **Developers** - Feature development and bug fixes
 - **Designers** - UX/UI improvements
 - **Writers** - Documentation and guides
-
-### **How to Contribute**
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-5. Join the community discussion
 
 ---
 
