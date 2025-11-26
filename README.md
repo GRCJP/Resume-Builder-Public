@@ -64,7 +64,16 @@ npm run dev
 # Copy environment template
 cp .env.example .env.local
 
-# Add your API keys (see API Setup section)
+# ⚠️ IMPORTANT: API Setup REQUIRED for Full Functionality!
+# Follow: docs/getting-started/API_SETUP.md
+
+# Required APIs for complete features:
+# - USAJobs API (FREE, 5 min) - Federal jobs
+# - Gmail OAuth (FREE, 10 min) - Email parsing  
+# - Job Board API (FREE, 3-5 min) - JSearch/Adzuna/SerpApi
+# - Email Alerts (FREE, 5 min each) - LinkedIn/Indeed/Lensa
+
+# Add your API keys to .env.local
 # Configure your preferred job boards
 # Set up Gmail integration for job alerts
 ```

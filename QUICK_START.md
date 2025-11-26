@@ -19,7 +19,40 @@ npm run dev
 ```
 Visit `http://localhost:3000`
 
-### **3. Make Your First Contribution**
+### **3. API Setup (REQUIRED for Full Functionality)**
+
+⚠️ **IMPORTANT**: API setup is **REQUIRED** for full functionality!
+
+**For Basic Features (No API Setup Needed):**
+- ✅ Resume upload and parsing
+- ✅ ATS scoring and optimization
+- ✅ Resume tailoring suggestions
+- ✅ Application tracking
+
+**For Full Features (API Setup REQUIRED):**
+- 🔧 **Job Discovery** - USAJobs, JSearch, Adzuna, SerpApi
+- 🔧 **Email Integration** - LinkedIn, Indeed, Lensa job alerts
+- 🔧 **Real-time Jobs** - Live job board integration
+
+**Quick API Setup (15 minutes):**
+```bash
+# 1. Copy environment template
+cp .env.example .env.local
+
+# 2. Set up APIs (REQUIRED for job features)
+# Follow: docs/getting-started/API_SETUP.md
+
+# 3. Required APIs for full functionality:
+# - USAJobs API (FREE, 5 min)
+# - Gmail OAuth (FREE, 10 min) 
+# - One Job Board API: JSearch OR Adzuna OR SerpApi (FREE, 3-5 min)
+# - Email Alerts: LinkedIn + Indeed + Lensa (FREE, 5 min each)
+
+# 4. Restart with APIs configured
+npm run dev
+```
+
+### **4. Make Your First Contribution**
 - **UI Improvement?** Edit components in `/components/`
 - **Bug Fix?** Check `/lib/` for logic issues
 - **Documentation?** Update files in `/docs/`
