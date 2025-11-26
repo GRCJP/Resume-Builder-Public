@@ -1,946 +1,764 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Search, Briefcase, ExternalLink, Star, MapPin, Clock, DollarSign, Building, Calendar, Mail } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, RefreshCw, ExternalLink, Calendar, Building2, MapPin, Briefcase, AlertCircle, CheckCircle, Mail } from 'lucide-react'
 import { scanJobBoards, defaultScanConfig } from '../lib/jobScanner'
-import { getStoredJobs, getNewJobsCount, clearNewFlags, updateJobStatus, JobWithScore } from '../lib/jobStorage'
-import { generateSearchQueries } from '../lib/searchQueryBuilder'
+
+interface Job {
+  id: string
+  title: string
+  company: string
+  location?: string
+  url?: string
+  description?: string
+  source: string
+  postedDate?: string
+  scannedAt: string
+  requiresLogin?: boolean
+  linkStatus?: number
+  score?: number
+  scoreReasons?: string[]
+  matchLevel?: 'Excellent' | 'Good' | 'Fair' | 'Poor'
+}
 
 interface JobDiscoveryDashboardProps {
-  resumeContent: string
-  selectedResumeName: string
+  resumeContent?: string
+  selectedResumeName?: string
   onTailorResume?: (jobDescription: string, jobTitle: string, company: string) => void
 }
 
-type JobSource = 'all' | 'linkedin' | 'indeed' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'momproject' | 'usajobs' | 'remoteok' | 'curated'
-
 export default function JobDiscoveryDashboard({ resumeContent, selectedResumeName, onTailorResume }: JobDiscoveryDashboardProps) {
-  const [jobs, setJobs] = useState<JobWithScore[]>([])
-  const [filteredJobs, setFilteredJobs] = useState<JobWithScore[]>([])
-  const [selectedSource, setSelectedSource] = useState<JobSource>('all')
-  const [selectedBucket, setSelectedBucket] = useState<string | null>(null)
-  const [scoreBuckets, setScoreBuckets] = useState<any[]>([])
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [lastRefresh, setLastRefresh] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortBy, setSortBy] = useState<'date' | 'company' | 'title' | 'score'>('score')
+  const [filterSource, setFilterSource] = useState<string>('all')
+  const [filterMatchLevel, setFilterMatchLevel] = useState<string>('all')
+  
+  // Scanning state
   const [isScanning, setIsScanning] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
-  const [newJobsCount, setNewJobsCount] = useState(0)
   const [searchLocation, setSearchLocation] = useState('Remote')
-  const [isBatchScoring, setIsBatchScoring] = useState(false)
-  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
-  const [enableExperimentalScrapers, setEnableExperimentalScrapers] = useState(false) // Off by default
-  const [activeTab, setActiveTab] = useState<'home' | 'federal'>('home') // New: Tab state
 
-  // Helper functions
-  const loadJobs = () => {
-    const storedJobs = getStoredJobs()
-    setJobs(storedJobs as JobWithScore[])
-  }
+  // Load jobs on mount
+  useEffect(() => {
+    loadJobs()
+  }, [])
 
-  const getScoreBuckets = (jobs: JobWithScore[]) => {
-    const excellent = jobs.filter(j => (j.matchScore ?? 0) >= 90).length
-    const good = jobs.filter(j => (j.matchScore ?? 0) >= 75 && (j.matchScore ?? 0) < 90).length
-    const fair = jobs.filter(j => (j.matchScore ?? 0) >= 50 && (j.matchScore ?? 0) < 75).length
+  // Filter and sort jobs when dependencies change
+  useEffect(() => {
+    let filtered = [...jobs]
     
-    return [
-      { key: 'excellent', count: excellent, label: 'Excellent Matches', range: '≥90%', color: 'green' },
-      { key: 'good', count: good, label: 'Good Matches', range: '≥75%', color: 'yellow' },
-      { key: 'fair', count: fair, label: 'Fair Matches', range: '≥50%', color: 'orange' }
-    ]
-  }
-
-  const filterJobs = () => {
-    let filtered = jobs
-    
-    // Split by tab: Home shows non-federal, Federal shows USAJobs
-    if (activeTab === 'home') {
-      filtered = filtered.filter(job => job.source?.toLowerCase() !== 'usajobs')
-    } else if (activeTab === 'federal') {
-      filtered = filtered.filter(job => job.source?.toLowerCase() === 'usajobs')
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(job => 
+        job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (job.location && job.location.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
     }
     
-    if (selectedSource !== 'all') {
-      filtered = filtered.filter(job => job.source === selectedSource)
+    // Filter by source
+    if (filterSource !== 'all') {
+      console.log('🔍 Filtering by source:', filterSource)
+      console.log('🔍 Available sources:', jobs.map(job => job.source))
+      filtered = filtered.filter(job => job.source === filterSource)
+      console.log('🔍 After source filter:', filtered.length, 'jobs')
     }
     
-    if (selectedBucket) {
-      const score = parseInt(selectedBucket)
-      filtered = filtered.filter(job => {
-        const jobScore = job.matchScore || 0
-        if (selectedBucket === 'excellent') return jobScore >= 90
-        if (selectedBucket === 'good') return jobScore >= 75 && jobScore < 90
-        if (selectedBucket === 'fair') return jobScore >= 50 && jobScore < 75
-        return false
-      })
+    // Filter by match level
+    if (filterMatchLevel !== 'all') {
+      filtered = filtered.filter(job => job.matchLevel === filterMatchLevel)
     }
+    
+    // Sort jobs
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'score':
+          return (b.score || 0) - (a.score || 0)
+        case 'date':
+          return new Date(b.postedDate || b.scannedAt).getTime() - new Date(a.postedDate || a.scannedAt).getTime()
+        case 'company':
+          return a.company.localeCompare(b.company)
+        case 'title':
+          return a.title.localeCompare(b.title)
+        default:
+          return 0
+      }
+    })
     
     setFilteredJobs(filtered)
-  }
+  }, [jobs, searchTerm, sortBy, filterSource, filterMatchLevel])
 
-  // Add source count logging
-  const logSourceCounts = () => {
-    const usaJobs = jobs.filter(j => j.source?.toLowerCase() === 'usajobs')
-    const nonUsaJobs = jobs.filter(j => j.source?.toLowerCase() !== 'usajobs')
-    console.log('📊 Job Source Counts:', {
-      total: jobs.length,
-      usaJobs: usaJobs.length,
-      nonUsaJobs: nonUsaJobs.length,
-      sources: jobs.reduce((acc, job) => {
-        const source = job.source || 'unknown'
-        acc[source] = (acc[source] || 0) + 1
-        return acc
-      }, {} as Record<string, number>)
-    })
-  }
-
-  const getUnscoredJobs = () => jobs.filter(job => !job.matchScore)
-  const getNewJobsCount = () => jobs.filter(job => job.isNew).length
-
-  const getJobAgeInfo = (postedDate?: string) => {
-    if (!postedDate) return { text: 'Unknown', color: 'text-gray-400' }
+  const loadEmailJobs = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+  try {
+    console.log('📧 Loading email jobs from /api/resume-scored-jobs')
+    const response = await fetch('/api/resume-scored-jobs')
     
-    const now = new Date()
-    const posted = new Date(postedDate)
-    const daysDiff = Math.floor((now.getTime() - posted.getTime()) / (1000 * 60 * 60 * 24))
-    
-    if (daysDiff === 0) return { text: 'Today', color: 'text-green-400' }
-    if (daysDiff === 1) return { text: 'Yesterday', color: 'text-green-400' }
-    if (daysDiff <= 3) return { text: `${daysDiff} days ago`, color: 'text-green-400' }
-    if (daysDiff <= 7) return { text: `${daysDiff} days ago`, color: 'text-yellow-400' }
-    if (daysDiff <= 30) return { text: `${Math.floor(daysDiff / 7)} weeks ago`, color: 'text-orange-400' }
-    return { text: `${Math.floor(daysDiff / 30)} months ago`, color: 'text-gray-400' }
-  }
-
-  // Helper functions defined early
-  // Helper to generate curated GRC job opportunities when APIs fail
-  const generateCuratedGRCJobs = (queries: string[]) => {
-    const baseJobs = [
-      {
-        id: `curated-grc-${Date.now()}-1`,
-        title: 'Senior GRC Analyst',
-        company: 'Microsoft',
-        location: 'Remote',
-        description: 'Leading GRC initiatives, NIST 800-53 compliance, and risk assessments for enterprise cloud services.',
-        url: 'https://careers.microsoft.com/us/en/job/123456',
-        source: 'curated' as const,
-        postedDate: new Date().toISOString(),
-        salary: '$130,000 - $160,000',
-        remote: true,
-        matchScore: 85,
-        scannedAt: new Date().toISOString()
-      },
-      {
-        id: `curated-grc-${Date.now()}-2`,
-        title: 'Cybersecurity Compliance Manager',
-        company: 'Amazon Web Services',
-        location: 'Remote',
-        description: 'Managing AWS compliance programs, SOC 2, ISO 27001, and customer audit requests for cloud services.',
-        url: 'https://www.amazon.jobs/en/jobs/123456',
-        source: 'curated' as const,
-        postedDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-        salary: '$140,000 - $180,000',
-        remote: true,
-        matchScore: 90,
-        scannedAt: new Date(Date.now() - 86400000).toISOString()
-      },
-      {
-        id: `curated-grc-${Date.now()}-3`,
-        title: 'IT Risk Manager',
-        company: 'JPMorgan Chase',
-        location: 'Hybrid - New York, NY',
-        description: 'Managing technology risk program, conducting risk assessments, and reporting to senior leadership.',
-        url: 'https://jpmorgan.taleo.net/career/123456',
-        source: 'curated' as const,
-        postedDate: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-        salary: '$150,000 - $190,000',
-        remote: false,
-        matchScore: 80,
-        scannedAt: new Date(Date.now() - 172800000).toISOString()
-      },
-      {
-        id: `curated-grc-${Date.now()}-4`,
-        title: 'Security Compliance Specialist',
-        company: 'Google',
-        location: 'Remote',
-        description: 'Supporting SOC 2, ISO 27001, and PCI DSS compliance for Google Cloud Platform services.',
-        url: 'https://careers.google.com/jobs/123456',
-        source: 'curated' as const,
-        postedDate: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-        salary: '$120,000 - $150,000',
-        remote: true,
-        matchScore: 88,
-        scannedAt: new Date(Date.now() - 259200000).toISOString()
-      },
-      {
-        id: `curated-grc-${Date.now()}-5`,
-        title: 'FedRAMP Security Analyst',
-        company: 'Oracle',
-        location: 'Remote',
-        description: 'Leading FedRAMP authorization efforts, continuous monitoring, and security assessments for federal cloud services.',
-        url: 'https://oracle.taleo.net/career/123456',
-        source: 'curated' as const,
-        postedDate: new Date(Date.now() - 345600000).toISOString(), // 4 days ago
-        salary: '$125,000 - $155,000',
-        remote: true,
-        matchScore: 82,
-        scannedAt: new Date(Date.now() - 345600000).toISOString()
-      },
-      {
-        id: `curated-grc-${Date.now()}-6`,
-        title: 'Cloud Security Architect',
-        company: 'IBM',
-        location: 'Hybrid - Austin, TX',
-        description: 'Designing security frameworks for multi-cloud environments and leading security architecture reviews.',
-        url: 'https://careers.ibm.com/job/123456',
-        source: 'curated' as const,
-        postedDate: new Date(Date.now() - 432000000).toISOString(), // 5 days ago
-        salary: '$160,000 - $200,000',
-        remote: false,
-        matchScore: 78,
-        scannedAt: new Date(Date.now() - 432000000).toISOString()
-      }
-    ]
-    
-    // Filter jobs based on search queries to make them more relevant
-    if (queries.length > 0) {
-      const queryLower = queries.join(' ').toLowerCase()
-      return baseJobs.filter(job => {
-        const jobText = (job.title + ' ' + job.description).toLowerCase()
-        return queryLower.split(' ').some(keyword => 
-          jobText.includes(keyword) || 
-          keyword.includes('grc') || 
-          keyword.includes('compliance') ||
-          keyword.includes('security')
-        )
-      })
+    if (!response.ok) {
+      throw new Error(`Failed to fetch resume-scored jobs: ${response.status}`)
     }
     
-    return baseJobs
+    const data = await response.json()
+    console.log('📊 Email jobs response:', data)
+    
+    if (data.status === 'success') {
+      const jobCount = data.jobs?.length || 0
+      console.log('✅ Email jobs loaded:', jobCount, 'jobs')
+      
+      if (jobCount === 0) {
+        console.log('⚠️ No email jobs found')
+        return { success: true, count: 0, error: 'No email jobs found. Process email alerts first.' }
+      }
+      
+      setJobs(data.jobs || [])
+      setLastRefresh(data.lastRefresh || new Date().toISOString())
+      return { success: true, count: jobCount }
+    } else {
+      throw new Error(data.error || 'Unknown error')
+    }
+    
+  } catch (err) {
+    console.error('Error loading email jobs:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Failed to load email jobs'
+    return { success: false, count: 0, error: errorMessage }
+  }
+}
+
+const loadApiJobs = async (emailJobs: any[] = []): Promise<{ success: boolean; count: number; error?: string }> => {
+  try {
+    console.log('🔍 Loading API jobs using GRC industry titles (no resume required)...')
+    
+    const apiConfig = {
+      includeAdzuna: true,
+      includeJSearch: true,
+      includeSerpApi: true,
+      includeUSAJobs: false,
+      includeEmailAlerts: false,
+    }
+    
+    // Use new title-based scanning instead of resume-based
+    const { scanGRCJobsByTitles } = await import('../lib/jobScanner')
+    const apiResult = await scanGRCJobsByTitles('Remote', apiConfig)
+    
+    if (apiResult && apiResult.totalFound > 0) {
+      const apiJobs = [
+        ...apiResult.highMatches,
+        ...apiResult.goodMatches,
+        ...apiResult.fairMatches
+      ].map((job: any) => ({
+        ...job,
+        source: job.source || 'api',
+        scannedAt: new Date().toISOString()
+      }))
+      
+      console.log('✅ API jobs loaded:', apiJobs.length, 'jobs')
+      
+      // Combine with existing email jobs
+      const allJobs = [...emailJobs, ...apiJobs]
+      setJobs(allJobs)
+      
+      return { success: true, count: apiJobs.length }
+    } else {
+      return { success: false, count: 0, error: 'No API jobs found' }
+    }
+    
+  } catch (err) {
+    console.error('Error loading API jobs:', err)
+    const errorMessage = err instanceof Error ? err.message : 'Failed to load API jobs'
+    return { success: false, count: 0, error: errorMessage }
+  }
+}
+
+const loadJobs = async () => {
+  setLoading(true)
+  setError(null)
+  setStatusMessage('📧 Loading email jobs...')
+  
+  try {
+    // Step 1: Load email jobs
+    const emailResult = await loadEmailJobs()
+    
+    if (!emailResult.success) {
+      setError(emailResult.error || 'Failed to load email jobs')
+      setStatusMessage('❌ Failed to load email jobs')
+      return
+    }
+    
+    if (emailResult.count === 0) {
+      setError(emailResult.error || 'No email jobs found')
+      setStatusMessage('📭 No email jobs found. Process email alerts first.')
+      return
+    }
+    
+    // Step 2: Load API jobs only if email jobs succeeded
+    setStatusMessage('🔍 Loading API jobs...')
+    const currentJobs = jobs || [] // Get the email jobs that were just loaded
+    const apiResult = await loadApiJobs(currentJobs)
+    
+    if (!apiResult.success) {
+      console.warn('API jobs failed, but email jobs loaded successfully')
+      setStatusMessage(`⚠️ Email jobs loaded (${emailResult.count}), but API jobs failed: ${apiResult.error}`)
+    } else {
+      setStatusMessage(`✅ Complete! ${emailResult.count} email jobs + ${apiResult.count} API jobs`)
+    }
+    
+  } catch (err) {
+    console.error('Error in sequential load:', err)
+    setError(err instanceof Error ? err.message : 'Failed to load jobs')
+    setStatusMessage('❌ Failed to load jobs')
+  } finally {
+    setLoading(false)
+  }
+}
+
+  const handleRefresh = () => {
+    loadJobs()
   }
 
-  const runMatchingEngine = async () => {
-    await handleScanJobs()
-  }
-
-  const sortJobsByScore = (jobs: JobWithScore[]) => {
-    return jobs.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
+  const handleProcessEmails = async () => {
+    setLoading(true)
+    setError(null)
+    setStatusMessage('📧 Processing email alerts...')
+    
+    try {
+      console.log('📧 Processing email alerts from Gmail...')
+      const response = await fetch('/api/email-alerts?fetch=true&process=true')
+      
+      if (!response.ok) {
+        throw new Error(`Failed to process email alerts: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('📊 Email processing response:', data)
+      
+      setStatusMessage(`✅ Processed ${data.emailsProcessed || 0} emails, found ${data.jobsFound || 0} jobs`)
+      
+      // Reload email jobs after processing
+      setTimeout(async () => {
+        const emailResult = await loadEmailJobs()
+        if (emailResult.success) {
+          setStatusMessage(`✅ ${emailResult.count} email jobs loaded successfully`)
+        } else {
+          setStatusMessage(`⚠️ Email processing complete, but loading failed: ${emailResult.error}`)
+        }
+      }, 1000)
+      
+    } catch (err) {
+      console.error('Error processing email alerts:', err)
+      setStatusMessage(`❌ Email processing failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleScanJobs = async () => {
-  console.log('🚨🚨🚨 SCAN STARTED - IF YOU SEE THIS, CODE IS EXECUTING 🚨🚨🚨')
-  console.log('🚨🚨🚨 TIMESTAMP:', new Date().toISOString(), '🚨🚨🚨')
-  console.log('🚨🚨🚨 RESUME LENGTH:', resumeContent.length, '🚨🚨🚨')
-  console.log('🚨 EMERGENCY: Starting scan with minimal configuration...')
-  
-  // Prevent multiple concurrent scans
-  if (isScanning) {
-    console.log('⚠️ Scan already in progress, ignoring request')
-    return
-  }
-  
-  try {
-    // Force reset any stuck state
-    setIsScanning(false)
-    setStatusMessage('🔄 Restarting scanner...')
-    
-    // Small delay to ensure state reset
-    await new Promise(resolve => setTimeout(resolve, 100))
+    if (isScanning) {
+      return
+    }
     
     setIsScanning(true)
-    setStatusMessage('🔍 Scanning job boards...')
+    setStatusMessage('🔍 Scanning API job boards using GRC industry titles...')
     
-    // Add emergency timeout
-    const emergencyTimeout = setTimeout(() => {
-      console.error('🚨 EMERGENCY TIMEOUT: Force stopping scan')
-      setIsScanning(false)
-      setStatusMessage('❌ Emergency timeout - scan stopped')
-      // Clear all state to prevent hanging
-      setJobs([])
-      setFilteredJobs([])
-    }, 120000) // 2 minutes timeout for comprehensive scan
-    
-    // Use the resumeContent prop instead of localStorage
-    if (!resumeContent) {
-      setStatusMessage('⚠️ Please upload your resume first')
-      setIsScanning(false)
-      clearTimeout(emergencyTimeout)
-      return
-    }
-    
-    console.log('🚀 Starting FULL SCAN with all APIs...')
-    
-    // Use full API configuration with maximum coverage
-    const fullConfig = {
-      ...defaultScanConfig,
-      minMatchScore: 50,
-      location: searchLocation,
-      sources: ['adzuna', 'serpapi', 'usajobs', 'jsearch', 'emailAlerts'], // All working APIs + Email Alerts
-      experimentalSources: []
-    }
-    
-    console.log('📊 Full config:', fullConfig)
-    console.log('🚨🚨🚨 ABOUT TO CALL SCAN JOB BOARDS - IF YOU SEE THIS, WE REACH THE API CALL 🚨🚨🚨')
-    setStatusMessage('🔍 Fetching from all APIs with maximum coverage...')
-    
-    const scanResult = await scanJobBoards(resumeContent, fullConfig.location || 'Remote', {
-      ...fullConfig,
-      linkedinPages: 6,        // Maximum pages
-      indeedPages: 6,         // Maximum pages
-      maxQueriesPerSource: 8, // Balanced for speed and coverage
-      includeAdzuna: true,      // ENABLED - working in email pipeline
-      includeSerpApi: true,     // ENABLED - confirmed functional
-      includeJSearch: true,       // ENABLED - working again
-      includeEmailAlerts: true  // ENABLED - email job fetching
-    })
-    
-    console.log('✅ Full scan completed:', scanResult)
-    console.log('📊 Scan result breakdown:', {
-      totalFound: scanResult.totalFound,
-      highMatches: scanResult.highMatches?.length || 0,
-      goodMatches: scanResult.goodMatches?.length || 0,
-      fairMatches: scanResult.fairMatches?.length || 0
-    })
-    
-    // Show pipeline stats if available
-    if (scanResult.pipelineStats) {
-      console.log('📊 PIPELINE STATS:', scanResult.pipelineStats)
-      console.log(`🔍 Pipeline Flow: ${scanResult.pipelineStats.phase1Raw} → ${scanResult.pipelineStats.phase2Filtered} → ${scanResult.pipelineStats.phase3Scored} → ${scanResult.pipelineStats.phase4Verified} → ${scanResult.pipelineStats.phase5Final}`)
-    }
-    
-    setStatusMessage('📊 Processing results...')
-    
-    // Flatten buckets into one list with all required properties
-    const allJobs = [
-      ...scanResult.highMatches,
-      ...scanResult.goodMatches,
-      ...scanResult.fairMatches || []  // Use fairMatches instead of otherMatches
-    ].map(job => ({
-      ...job,
-      scannedAt: job.scannedAt || new Date().toISOString() // Ensure scannedAt is present
-    }))
-    
-    console.log(`📊 Full scan: Total jobs processed: ${allJobs.length}`)
-    console.log('📊 Job sample before storage:', allJobs.slice(0, 3).map(job => ({
-      title: job.title,
-      company: job.company,
-      matchScore: job.matchScore,
-      source: job.source
-    })))
-    
-    // Import and use the proper storage function
-    const { saveJobs } = await import('../lib/jobStorage')
-    
-    // Add scannedAt timestamp to all jobs before saving
-    const jobsWithTimestamp = allJobs.map(job => ({
-      ...job,
-      scannedAt: new Date().toISOString()
-    }))
-    
-    // Clear old data and save fresh jobs using the correct function
-    saveJobs(jobsWithTimestamp as JobWithScore[])
-    
-    // Immediately update UI state
-    setJobs(allJobs as JobWithScore[])
-    setNewJobsCount(allJobs.length)
-    setStatusMessage(`✅ Full scan complete. Found ${allJobs.length} jobs.`)
-    
-    console.log('📊 Jobs saved and state updated:', allJobs.length)
-    console.log('📊 Source breakdown:', allJobs.reduce((acc, job) => {
-      acc[job.source] = (acc[job.source] || 0) + 1
-      return acc
-    }, {} as Record<string, number>))
-    
-    // Add source count logging to verify USAJobs
-    const usaJobs = allJobs.filter(j => j.source?.toLowerCase() === 'usajobs')
-    const nonUsaJobs = allJobs.filter(j => j.source?.toLowerCase() !== 'usajobs')
-    console.log('📊 FINAL SOURCE COUNTS:', {
-      total: allJobs.length,
-      usaJobs: usaJobs.length,
-      nonUsaJobs: nonUsaJobs.length,
-      usaJobsSample: usaJobs.slice(0, 3).map(j => ({ title: j.title, company: j.company, source: j.source }))
-    })
-    
-    clearTimeout(emergencyTimeout)
-    
-  } catch (error) {
-    console.error('🚨 EMERGENCY: Scan failed:', error)
-    setStatusMessage(`❌ Emergency scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    
-    // Emergency cleanup
-    setIsScanning(false)
-    setJobs([])
-    setFilteredJobs([])
-    
-    // Don't auto-retry to prevent flickering
-    setTimeout(() => {
-      setStatusMessage('⚠️ Scan failed. Click "Force Rescan" to try again.')
-    }, 3000)
-    
-    return // Stop here to prevent flickering
-  } finally {
-    setIsScanning(false)
-    // Don't auto-clear status message on error
-    if (statusMessage.includes('failed') || statusMessage.includes('timeout')) {
-      // Keep error message visible
-    } else {
-      setTimeout(() => setStatusMessage(''), 5000)
-    }
-  }
-}
-
-  const handleEmailAlert = async () => {
-    if (jobs.length === 0) {
-      setStatusMessage('⚠️ No jobs to email - run a scan first')
-      return
-    }
-
     try {
-      setStatusMessage('📧 Sending job alert email...')
-      
-      // Get high and good matches for email
-      const emailJobs = jobs.filter(job => (job.matchScore ?? 0) >= 75)
+      // Get current email jobs
+      const currentJobs = jobs || []
+      const emailJobs = currentJobs.filter(job => job.source.includes('-email'))
       
       if (emailJobs.length === 0) {
-        setStatusMessage('⚠️ No high-quality jobs to email')
+        setStatusMessage('⚠️ No email jobs found. Process email alerts first.')
+        setIsScanning(false)
         return
       }
-
-      const emailResponse = await fetch('/api/email-alerts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jobs: emailJobs,
-          subject: `🎯 ${emailJobs.length} Top Job Matches - ${new Date().toLocaleDateString()}`
-        })
-      })
-
-      if (emailResponse.ok) {
-        const emailResult = await emailResponse.json()
-        setStatusMessage(`✅ Email sent! Check your inbox for ${emailJobs.length} job matches`)
-        console.log('✅ Manual email sent:', emailResult.messageId)
+      
+      // Load API jobs using title-based scanning (no resume required)
+      const apiResult = await loadApiJobs(emailJobs)
+      
+      if (apiResult.success) {
+        setStatusMessage(`✅ Complete! ${emailJobs.length} email jobs + ${apiResult.count} GRC title-based API jobs`)
       } else {
-        const error = await emailResponse.text()
-        setStatusMessage(`❌ Email failed: ${error}`)
-        console.error('❌ Manual email failed:', error)
+        setStatusMessage(`⚠️ API scan failed: ${apiResult.error}. Email jobs still available.`)
       }
+      
     } catch (error) {
-      setStatusMessage('❌ Email send failed')
-      console.error('❌ Manual email error:', error)
+      console.error('❌ API scan failed:', error)
+      setStatusMessage(`❌ Scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsScanning(false)
     }
   }
 
-const handleClearResults = () => {
-  console.log('🧹 Clearing search results only')
-  
-  // Clear only search results and related state
-  setIsScanning(false)
-  setStatusMessage('')
-  setJobs([])
-  setFilteredJobs([])
-  setSelectedBucket(null)
-  setNewJobsCount(0)
-  
-  // Clear only job-related storage, keep other app settings
-  localStorage.removeItem('storedJobs')
-  localStorage.removeItem('newJobFlags')
-  
-  console.log('✅ Search results cleared')
-  setStatusMessage('🧹 Search results cleared')
-  setTimeout(() => setStatusMessage(''), 2000)
-}
+  const handleJobClick = (job: Job) => {
+    if (job.url) {
+      window.open(job.url, '_blank', 'noopener,noreferrer')
+    }
+  }
 
-  const handleBatchScore = async () => {
-    // Batch scoring not implemented yet
-    setStatusMessage('⚠️ Batch scoring not available')
+  const handleTailorResume = (job: Job) => {
+    if (onTailorResume && job.description) {
+      onTailorResume(job.description, job.title, job.company)
+    }
+  }
+
+  const handleAppliedJob = (job: Job) => {
+    // Mark job as applied in localStorage for Application Tracker
+    const appliedJobs = JSON.parse(localStorage.getItem('appliedJobs') || '[]')
+    const jobExists = appliedJobs.find((appliedJob: any) => appliedJob.id === job.id)
+    
+    if (!jobExists) {
+      const appliedJob = {
+        ...job,
+        status: 'applied',
+        appliedDate: new Date().toISOString(),
+        notes: ''
+      }
+      appliedJobs.push(appliedJob)
+      localStorage.setItem('appliedJobs', JSON.stringify(appliedJobs))
+      
+      // Show success message
+      setStatusMessage(`✅ Applied to "${job.title}" at ${job.company} - Added to Application Tracker`)
+      
+      // Clear message after 3 seconds
+      setTimeout(() => setStatusMessage(''), 3000)
+    } else {
+      setStatusMessage(`⚠️ "${job.title}" at ${job.company} is already marked as applied`)
+      setTimeout(() => setStatusMessage(''), 3000)
+    }
+  }
+
+  const handleNotInterestedJob = (job: Job) => {
+    // Remove job from the current jobs list
+    const updatedJobs = jobs.filter(j => j.id !== job.id)
+    setJobs(updatedJobs)
+    
+    // Also save to not interested list for tracking
+    const notInterestedJobs = JSON.parse(localStorage.getItem('notInterestedJobs') || '[]')
+    const jobExists = notInterestedJobs.find((notJob: any) => notJob.id === job.id)
+    
+    if (!jobExists) {
+      const notInterestedJob = {
+        ...job,
+        status: 'not interested',
+        removedDate: new Date().toISOString(),
+        notes: ''
+      }
+      notInterestedJobs.push(notInterestedJob)
+      localStorage.setItem('notInterestedJobs', JSON.stringify(notInterestedJobs))
+    }
+    
+    // Show success message
+    setStatusMessage(`🗑️ Removed "${job.title}" at ${job.company} - Not Interested`)
+    
+    // Clear message after 3 seconds
     setTimeout(() => setStatusMessage(''), 3000)
   }
 
-  const handleTailorResume = (jobDescription: string, jobTitle: string, company: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    if (onTailorResume) {
-      onTailorResume(jobDescription, jobTitle, company)
-      setStatusMessage(`📝 Tailoring resume for ${jobTitle} at ${company}`)
-      setTimeout(() => setStatusMessage(''), 3000)
-    } else {
-      setStatusMessage('⚠️ Resume tailoring not available')
-      setTimeout(() => setStatusMessage(''), 3000)
+  const getScoreColor = (score: number) => {
+    if (score >= 85) return 'bg-gradient-to-r from-green-500 to-emerald-500'
+    if (score >= 75) return 'bg-gradient-to-r from-blue-500 to-cyan-500'
+    if (score >= 65) return 'bg-gradient-to-r from-yellow-500 to-orange-500'
+    return 'bg-gradient-to-r from-gray-500 to-slate-500'
+  }
+
+  const getMatchLevelColor = (level: string) => {
+    switch (level) {
+      case 'Excellent': return 'bg-green-500/20 text-green-400 border-green-500/50'
+      case 'Good': return 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+      case 'Fair': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50'
+      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/50'
     }
   }
 
-  const handleSaveJob = (jobId: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    updateJobStatus(jobId, 'saved')
-    setStatusMessage('✨ Job saved to Application Tracker')
-    setTimeout(() => setStatusMessage(''), 3000)
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
-
-  const handleApplyClick = (url: string, jobId: string, e: React.MouseEvent) => {
-    console.log('=== handleApplyClick called ===')
-    console.log('URL:', url)
-    console.log('Job ID:', jobId)
-    
-    e.preventDefault()
-    e.stopPropagation()
-    
-    // Validate URL
-    if (!url || !url.startsWith('http')) {
-      console.log('❌ Invalid URL validation failed')
-      setStatusMessage('⚠️ Invalid job URL. Please copy and search manually.')
-      setTimeout(() => setStatusMessage(''), 3000)
-      return
-    }
-    
-    console.log('✅ URL validation passed')
-    
-    // Handle browser extension conflicts when opening new window
-    try {
-      console.log('🔗 Attempting to open window with URL:', url)
-      const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
-      
-      // Check if window was blocked by popup blocker
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        console.log('❌ Window was blocked or failed to open')
-        throw new Error('Popup blocked')
-      }
-      
-      console.log('✅ Window opened successfully')
-      // Only mark as applied after successful opening
-      updateJobStatus(jobId, 'applied')
-      setStatusMessage('✅ Job application opened')
-      setTimeout(() => setStatusMessage(''), 3000)
-    } catch (error) {
-      console.error('❌ Browser extension conflict or popup blocker detected:', error)
-      setStatusMessage('🔗 Browser blocked popup. Copy URL: ' + url)
-      setTimeout(() => setStatusMessage(''), 5000)
-      
-      // Fallback: create a temporary link and click it
-      try {
-        console.log('🔄 Trying fallback link method')
-        const link = document.createElement('a')
-        link.href = url
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        console.log('✅ Fallback link method succeeded')
-        // Mark as applied after successful fallback
-        updateJobStatus(jobId, 'applied')
-        setStatusMessage('✅ Job application opened via fallback')
-        setTimeout(() => setStatusMessage(''), 3000)
-      } catch (fallbackError) {
-        console.error('❌ Fallback method also failed:', fallbackError)
-        // Last resort: copy to clipboard
-        navigator.clipboard.writeText(url).then(() => {
-          console.log('✅ Clipboard copy succeeded')
-          setStatusMessage('📋 URL copied to clipboard! Paste in new tab.')
-          // Mark as applied after successful clipboard copy
-          updateJobStatus(jobId, 'applied')
-          setTimeout(() => setStatusMessage(''), 3000)
-        }).catch(() => {
-          console.error('❌ All methods failed')
-          setStatusMessage('🔗 Manual access needed: ' + url)
-          // Don't mark as applied if all methods failed
-        })
-      }
-    }
-    
-    console.log('=== handleApplyClick finished ===')
-  }
-
-  // Create a URL handler for viewing job details
-  const getViewUrl = (job: any) => {
-    // Always use the canonical job detail URL
-    return job.url
-  }
-
-  const handleViewClick = (url: string, jobId: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    if (!url || !url.startsWith("http")) {
-      setStatusMessage("Invalid job URL")
-      return
-    }
-
-    const win = window.open(url, "_blank", "noopener,noreferrer")
-    if (win) updateJobStatus(jobId, "saved")
-  }
-
-  const getJobButtonProps = (job: any) => {
-    const detailUrl = getViewUrl(job)
-    
-    // Only disable for known dead links or missing URLs
-    if (job.linkStatus === 404 || job.linkStatus === 410 || !detailUrl) {
-      return {
-        disabled: true,
-        className: "flex items-center gap-2 px-4 py-2 bg-gray-600 text-gray-300 rounded-lg text-sm font-semibold cursor-not-allowed opacity-60",
-        title: job.linkStatus === 404 ? "Job not found (404)" : 
-               job.linkStatus === 410 ? "Job expired (410)" :
-               !detailUrl ? "No URL available" : "Job not available"
-      }
-    }
-    
-    // Enable for all other cases - let user try to view
-    const isVerified = !!job.verifiedAt
-    return {
-      disabled: false,
-      className: isVerified
-        ? "flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-sm font-semibold shadow-lg transition-all"
-        : "flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold shadow-lg transition-all",
-      title: isVerified ? "View verified job details" : "View job details (unverified)"
-    }
-  }
-
-  const handleClearNew = () => {
-    clearNewFlags()
-    setNewJobsCount(0)
-    loadJobs()
-  }
-
-  // Load jobs on mount and auto-scan if empty
-  useEffect(() => {
-    loadJobs()
-    setNewJobsCount(getNewJobsCount())
-    // DISABLED: Auto-scan to prevent flickering
-    // if (resumeContent && getStoredJobs().length === 0) {
-    //   console.log('🚀 Resume detected, initializing AI Matching Engine...')
-    //   runMatchingEngine()
-    // }
-  }, [resumeContent])
-
-  // Auto-scan whenever a new resume is selected
-  useEffect(() => {
-    // DISABLED: Auto-scan to prevent flickering
-    // if (resumeContent && getStoredJobs().length === 0 && !isScanning) {
-    //   console.log('🚀 Resume changed, re-initializing AI Matching Engine...')
-    //   runMatchingEngine()
-    // }
-  }, [resumeContent, isScanning])
-
-  // Update buckets when jobs change
-  useEffect(() => {
-    const buckets = getScoreBuckets(jobs)
-    setScoreBuckets(buckets)
-    filterJobs()
-  }, [jobs, selectedSource, selectedBucket, activeTab]) // Added activeTab dependency
-
-  // Auto-select and populate one of the top matching jobs (randomized for variety)
-  useEffect(() => {
-    const scoredJobs = jobs.filter(j => (j.matchScore ?? 0) >= 70)
-    if (scoredJobs.length > 0) {
-      // Pick a random job from the top 5 to show variety
-      const topJobs = scoredJobs.sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0)).slice(0, 5)
-      const randomTopJob = topJobs[Math.floor(Math.random() * topJobs.length)]
-      
-      setStatusMessage(`🎯 Top Match: ${randomTopJob.title} (${randomTopJob.matchScore}%)`)
-    } else {
-      // Don't clear status message if scanning/scoring
-      if (!isScanning && !isBatchScoring) {
-        // setStatusMessage('')
-      }
-    }
-  }, [jobs])
 
   return (
     <div className="space-y-6">
-      {/* Live Agent Status Bar */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-2xl border border-purple-500/30 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isScanning ? 'bg-purple-500/20 animate-pulse' : 'bg-purple-500/10'}`}>
-              {isScanning ? <Search className="w-5 h-5 text-purple-400 animate-spin" /> : <Briefcase className="w-5 h-5 text-purple-400" />}
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-purple-100 flex items-center gap-2">
-                AI Job Matching Engine
-              </h2>
-              <div className="text-sm text-purple-300 flex items-center gap-2 h-5">
-                {isScanning ? (
-                  <span>{statusMessage || 'Scanning job networks...'}</span>
-                ) : isBatchScoring ? (
-                  <span>{statusMessage || `Scoring candidates (${batchProgress.current}/${batchProgress.total})...`}</span>
-                ) : (
-                  <span>{statusMessage || 'Monitoring for high-value matches'}</span>
-                )}
-              </div>
-            </div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
+            <Search className="w-6 h-6 text-white" />
           </div>
-          
-          <div className="flex items-center gap-3">
-            {newJobsCount > 0 && (
-              <button
-                onClick={handleClearNew}
-                className="px-3 py-1 bg-green-900/30 text-green-300 rounded text-sm hover:bg-green-900/50 transition-colors"
-              >
-                {newJobsCount} new matches
-              </button>
-            )}
-            <button
-              onClick={() => runMatchingEngine()}
-              disabled={isScanning || !resumeContent}
-              className="px-4 py-2 bg-purple-600/20 text-purple-200 hover:bg-purple-600/40 rounded-lg text-sm font-medium transition-all border border-purple-500/30 disabled:opacity-50"
-            >
-              {isScanning ? 'Agent Running...' : 'Scan'}
-            </button>
-            <button
-              onClick={handleEmailAlert}
-              disabled={isScanning || jobs.length === 0}
-              className="p-2 bg-green-600/20 text-green-200 hover:bg-green-600/40 rounded-lg text-sm font-medium transition-all border border-green-500/30 disabled:opacity-50"
-              title="Email job alerts"
-            >
-              <Mail className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Home / Federal Tabs */}
-      <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl border border-slate-500/30 p-1 flex gap-1">
-        <button
-          onClick={() => setActiveTab('home')}
-          className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all ${
-            activeTab === 'home'
-              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-              : 'text-slate-300 hover:bg-slate-700/50'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <Briefcase className="w-4 h-4" />
-            <span>Top Matches (Non-Federal)</span>
-            <span className="px-2 py-0.5 bg-white/20 rounded text-xs">
-              {jobs.filter(j => j.source?.toLowerCase() !== 'usajobs').length}
-            </span>
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('federal')}
-          className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-all ${
-            activeTab === 'federal'
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
-              : 'text-slate-300 hover:bg-slate-700/50'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <Building className="w-4 h-4" />
-            <span>Federal Roles (USAJobs)</span>
-            <span className="px-2 py-0.5 bg-white/20 rounded text-xs">
-              {jobs.filter(j => j.source?.toLowerCase() === 'usajobs').length}
-            </span>
-          </div>
-        </button>
-      </div>
-
-      {/* Score Buckets */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { key: 'excellent', label: 'Excellent Matches', range: '≥90%', color: 'green' },
-          { key: 'good', label: 'Good Matches', range: '≥75%', color: 'yellow' },
-          { key: 'fair', label: 'Fair Matches', range: '≥50%', color: 'orange' }
-        ].map(bucket => {
-          // Filter jobs by active tab first, then count jobs in this score range
-          const tabFilteredJobs = activeTab === 'home' 
-            ? jobs.filter(j => j.source?.toLowerCase() !== 'usajobs')
-            : jobs.filter(j => j.source?.toLowerCase() === 'usajobs')
-          
-          const count = tabFilteredJobs.filter(j => {
-            const score = j.matchScore || 0
-            if (bucket.key === 'excellent') return score >= 90
-            if (bucket.key === 'good') return score >= 75 && score < 90
-            if (bucket.key === 'fair') return score >= 50 && score < 75
-            return false
-          }).length
-
-          const isSelected = selectedBucket === bucket.key
-          const colorClasses = {
-            green: 'from-green-800/60 to-emerald-800/60 border-green-400/60 text-green-100',
-            yellow: 'from-yellow-800/60 to-amber-800/60 border-yellow-400/60 text-yellow-100',
-            orange: 'from-orange-800/60 to-red-800/60 border-orange-400/60 text-orange-100'
-          }
-
-          return (
-            <div
-              key={bucket.key}
-              onClick={() => setSelectedBucket(isSelected ? null : bucket.key)}
-              className={`cursor-pointer rounded-xl p-4 border transition-all ${
-                isSelected
-                  ? colorClasses[bucket.color as keyof typeof colorClasses]
-                  : 'bg-slate-700/40 border-slate-500/40 hover:bg-slate-700/60 text-slate-200'
-              }`}
-            >
-              <div className="text-2xl font-bold mb-1">{count}</div>
-              <div className="text-sm opacity-80">{bucket.label}</div>
-              <div className="text-xs opacity-60">{bucket.range}</div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Advanced Options */}
-      <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl p-4 border border-slate-500/30">
-        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-slate-200">Advanced Options</h3>
-            <p className="text-xs text-slate-400 mt-1">Experimental features may be incomplete</p>
+            <h2 className="text-2xl font-bold text-white">Job Discovery</h2>
+            <p className="text-gray-400">Resume-scored jobs from your email alerts</p>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={enableExperimentalScrapers}
-              onChange={(e) => setEnableExperimentalScrapers(e.target.checked)}
-              className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
-            />
-            <span className="text-sm text-slate-200">Enable experimental scrapers</span>
-          </label>
         </div>
-        {enableExperimentalScrapers && (
-          <div className="mt-3 pt-3 border-t border-slate-600/30">
-            <p className="text-xs text-slate-400">
-              Experimental scrapers include: LinkedIn, Indeed, Dice, ZipRecruiter, Glassdoor, Mom Project
-            </p>
-          </div>
-        )}
+        
+        <div className="flex items-center gap-3">
+          {lastRefresh && (
+            <div className="text-sm text-gray-400">
+              Last updated: {formatDate(lastRefresh)}
+            </div>
+          )}
+          <button
+            onClick={handleProcessEmails}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Process Emails
+          </button>
+          <button
+            onClick={handleScanJobs}
+            disabled={loading || isScanning}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+          >
+            <Search className={`w-4 h-4 ${isScanning ? 'animate-pulse' : ''}`} />
+            {isScanning ? 'Scanning...' : 'Scan GRC Jobs by Title'}
+          </button>
+        </div>
       </div>
 
-      {/* Job List */}
-      {filteredJobs.length === 0 ? (
-        <div className="text-center py-12 text-purple-300">
-          <Search className="w-16 h-16 mx-auto mb-4 text-purple-400" />
-          <p className="text-lg font-semibold mb-2">No high-confidence matches found yet</p>
-          <p className="text-sm text-purple-400">
-            {resumeContent ? 'The AI agent is scanning networks for you...' : 'Upload a resume to activate the agent'}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
-          {filteredJobs.map((job: JobWithScore) => (
-            <div key={job.id} className="bg-slate-800/30 backdrop-blur-sm rounded-xl p-4 border border-purple-500/30 hover:border-purple-400/50 transition-all group">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-bold text-purple-100 text-lg group-hover:text-purple-300 transition-colors">{job.title}</h4>
-                    {job.isNew && (
-                      <span className="px-2 py-0.5 bg-green-900/30 text-green-300 rounded text-xs font-semibold flex items-center gap-1">
-                        NEW
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm text-purple-300">{job.company}</div>
-                  <div className="text-xs text-purple-400 mt-1 flex items-center gap-2">
-                    <span>{job.location}</span>
-                    <span>•</span>
-                    <span className="capitalize">{job.source}</span>
-                    <span>•</span>
-                    <span className={getJobAgeInfo(job.postedDate).color}>
-                      {getJobAgeInfo(job.postedDate).text}
-                    </span>
-                    {job.verifiedAt && (
-                      <>
-                        <span>•</span>
-                        <span className={job.linkStatus && job.linkStatus < 400 ? 'text-green-400' : 'text-red-400'}>
-                          {job.linkStatus && job.linkStatus < 400 ? '✓ Verified' : `✗ ${job.linkStatus || 'Failed'}`}
-                        </span>
-                      </>
-                    )}
-                    {job.requiresLogin && (
-                      <>
-                        <span>•</span>
-                        <span className="text-yellow-400">Login Required</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex flex-col items-end gap-2">
-                  {job.matchScore !== undefined && (
-                    <div className={`flex flex-col items-end ${
-                      job.matchScore >= 90 ? 'text-green-400' :
-                      job.matchScore >= 75 ? 'text-yellow-400' :
-                      'text-orange-400'
-                    }`}>
-                      <span className="text-2xl font-bold">{job.matchScore}%</span>
-                      <span className="text-xs font-medium opacity-75">MATCH</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                    <button
-                      onClick={(e) => handleTailorResume(job.description || '', job.title, job.company, e)}
-                      className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-purple-300 border border-purple-500/30 rounded-lg hover:bg-purple-900/30 hover:text-purple-100 transition-all text-sm font-medium"
-                      title="Tailor Resume for This Job"
-                    >
-                      Tailor
-                    </button>
-                    <button
-                      onClick={(e) => handleSaveJob(job.id, e)}
-                      className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-purple-300 border border-purple-500/30 rounded-lg hover:bg-purple-900/30 hover:text-purple-100 transition-all text-sm font-medium"
-                      title="Save for Later"
-                    >
-                      Save
-                    </button>
-                    {(() => {
-                        const buttonProps = getJobButtonProps(job)
-                        const detailUrl = getViewUrl(job)
-                        
-                        if (!detailUrl) {
-                          return (
-                            <button
-                              disabled={true}
-                              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-gray-300 rounded-lg text-sm font-semibold cursor-not-allowed opacity-60"
-                              title="No URL available"
-                            >
-                              No URL
-                              <ExternalLink className="w-4 h-4" />
-                            </button>
-                          )
-                        }
-                        
-                        if (job.linkStatus === 404 || job.linkStatus === 410) {
-                          return (
-                            <button
-                              {...buttonProps}
-                            >
-                              {job.linkStatus === 404 ? 'Not Found' : 'Expired'}
-                              <ExternalLink className="w-4 h-4" />
-                            </button>
-                          )
-                        }
-                        
-                        return (
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              
-                              console.log('View button clicked for job:', job.id)
-                              console.log('Detail URL:', detailUrl)
-                              handleViewClick(detailUrl, job.id, e)
-                            }}
-                            {...buttonProps}
-                          >
-                            View Job
-                            <ExternalLink className="w-4 h-4" />
-                          </button>
-                        )
-                      })()}
-                  </div>
-                </div>
-              </div>
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <Search className="w-5 h-5 text-purple-400" />
+            <div>
+              <div className="text-2xl font-bold text-white">{filteredJobs.length}</div>
+              <div className="text-sm text-gray-400">Filtered Jobs</div>
             </div>
-          ))}
+          </div>
+        </div>
+        
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full" />
+            <div>
+              <div className="text-2xl font-bold text-white">
+                {filteredJobs.filter(job => job.matchLevel === 'Excellent').length}
+              </div>
+              <div className="text-sm text-gray-400">Excellent Matches</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full" />
+            <div>
+              <div className="text-2xl font-bold text-white">
+                {filteredJobs.filter(job => job.matchLevel === 'Good').length}
+              </div>
+              <div className="text-sm text-gray-400">Good Matches</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <Building2 className="w-5 h-5 text-purple-400" />
+            <div>
+              <div className="text-2xl font-bold text-white">
+                {new Set(filteredJobs.map(job => job.company)).size}
+              </div>
+              <div className="text-sm text-gray-400">Companies</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full" />
+            <div>
+              <div className="text-2xl font-bold text-white">
+                {filteredJobs.length > 0 ? Math.round(filteredJobs.reduce((sum, job) => sum + (job.score || 0), 0) / filteredJobs.length) : 0}
+              </div>
+              <div className="text-sm text-gray-400">Avg Score</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Search Jobs</label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by title, company, or location..."
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
           
-          {/* Clear Results Button - Less Prominent Position */}
-          {jobs.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-slate-700/50">
-              <button
-                onClick={handleClearResults}
-                className="w-full px-3 py-2 bg-slate-700/30 text-slate-400 hover:bg-slate-700/50 rounded-lg text-sm font-medium transition-all border border-slate-600/30"
-                title="Clear all search results and start fresh"
-              >
-                🧹 Clear Results
-              </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'date' | 'company' | 'title' | 'score')}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="score">Resume Match (High to Low)</option>
+              <option value="date">Most Recent</option>
+              <option value="company">Company (A-Z)</option>
+              <option value="title">Title (A-Z)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Source</label>
+            <select
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="all">All Sources</option>
+              
+              {/* Email Sources (Priority) */}
+              <optgroup label="📧 Email Jobs">
+                <option value="linkedin-email">LinkedIn Email</option>
+                <option value="indeed-email">Indeed Email</option>
+                <option value="lensa-email">Lensa Email</option>
+              </optgroup>
+              
+              {/* API Sources */}
+              <optgroup label="🔍 API Jobs">
+                <option value="adzuna">Adzuna</option>
+                <option value="jsearch">JSearch</option>
+                <option value="serpapi">SerpApi</option>
+                <option value="linkedin">LinkedIn API</option>
+                <option value="indeed">Indeed API</option>
+                <option value="dice">Dice</option>
+                <option value="ziprecruiter">ZipRecruiter</option>
+                <option value="glassdoor">Glassdoor</option>
+                <option value="other">Other</option>
+                <option value="curated">Curated</option>
+              </optgroup>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Match Level</label>
+            <select
+              value={filterMatchLevel}
+              onChange={(e) => setFilterMatchLevel(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="all">All Levels</option>
+              <option value="Excellent">Excellent (85+)</option>
+              <option value="Good">Good (75+)</option>
+              <option value="Fair">Fair (65+)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Status Message */}
+      {statusMessage && (
+        <div className={`p-4 rounded-xl border ${
+          statusMessage.includes('❌') ? 'bg-red-900/20 border-red-500/50 text-red-400' :
+          statusMessage.includes('⚠️') ? 'bg-yellow-900/20 border-yellow-500/50 text-yellow-400' :
+          statusMessage.includes('✅') ? 'bg-green-900/20 border-green-500/50 text-green-400' :
+          'bg-blue-900/20 border-blue-500/50 text-blue-400'
+        }`}>
+          <div className="flex items-center gap-3">
+            <Search className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
+            <span>{statusMessage}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-4">
+          <div className="flex items-center gap-3 text-red-400">
+            <AlertCircle className="w-5 h-5" />
+            <div>
+              <div className="font-semibold">Error loading jobs</div>
+              <div className="text-sm">{error}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center gap-3 text-purple-400">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            <span>Loading resume-scored jobs...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Scanning State */}
+      {isScanning && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center gap-3 text-green-400">
+            <Search className="w-5 h-5 animate-spin" />
+            <span>Scanning job boards for GRC opportunities...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Jobs List */}
+      {!loading && !isScanning && !error && (
+        <div className="space-y-4">
+          {filteredJobs.length === 0 ? (
+            <div className="text-center py-12">
+              <Search className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-300 mb-2">
+                {jobs.length === 0 ? 'No resume-scored jobs found' : 'No jobs match your filters'}
+              </h3>
+              <p className="text-gray-500">
+                {jobs.length === 0 
+                  ? 'No jobs found. Try loading resume-scored jobs from your email alerts or scan job boards for new opportunities.'
+                  : 'Try adjusting your search or filter criteria.'
+                }
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {filteredJobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-purple-500/50 transition-all group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-white group-hover:text-purple-400 transition-colors">
+                          {job.title}
+                        </h3>
+                        
+                        {/* Score Badge */}
+                        {job.score && (
+                          <div className={`px-3 py-1 rounded-full text-white text-sm font-bold ${getScoreColor(job.score)}`}>
+                            {job.score}/100
+                          </div>
+                        )}
+                        
+                        {/* Match Level Badge */}
+                        {job.matchLevel && (
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getMatchLevelColor(job.matchLevel)}`}>
+                            {job.matchLevel}
+                          </span>
+                        )}
+                        
+                        {job.requiresLogin && (
+                          <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+                            Login Required
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-sm text-gray-400 mb-3">
+                        <div className="flex items-center gap-1">
+                          <Building2 className="w-4 h-4" />
+                          {job.company}
+                        </div>
+                        {job.location && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            {job.location}
+                          </div>
+                        )}
+                        {job.postedDate && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {formatDate(job.postedDate)}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {job.description && (
+                        <p className="text-gray-300 text-sm mb-3 line-clamp-2">
+                          {job.description}
+                        </p>
+                      )}
+                      
+                      {/* Score Reasons */}
+                      {job.scoreReasons && job.scoreReasons.length > 0 && (
+                        <div className="mb-3">
+                          <div className="text-xs text-gray-500 mb-1">Why this matches your resume:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {job.scoreReasons.slice(0, 3).map((reason, index) => (
+                              <span key={index} className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded">
+                                {reason}
+                              </span>
+                            ))}
+                            {job.scoreReasons.length > 3 && (
+                              <span className="text-xs text-gray-500 px-2 py-1">
+                                +{job.scoreReasons.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <Search className="w-3 h-3" />
+                        <span className="flex items-center gap-1">
+                          {job.source.includes('-email') ? (
+                            <>
+                              <Mail className="w-3 h-3 text-green-400" />
+                              {job.source.replace('-email', '')} Email
+                            </>
+                          ) : (
+                            <>
+                              <Briefcase className="w-3 h-3 text-blue-400" />
+                              {job.source.charAt(0).toUpperCase() + job.source.slice(1)}
+                            </>
+                          )}
+                        </span>
+                        <span>•</span>
+                        <span>Scanned: {formatDate(job.scannedAt)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 ml-4">
+                      {job.url && (
+                        <button
+                          onClick={() => handleJobClick(job)}
+                          className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                          title="View Job"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onTailorResume && resumeContent && (
+                        <button
+                          onClick={() => handleTailorResume(job)}
+                          className="p-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors"
+                          title="Tailor Resume"
+                        >
+                          <Briefcase className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleAppliedJob(job)}
+                        className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                        title="Applied - Add to Application Tracker"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="text-xs">Applied</span>
+                      </button>
+                      <button
+                        onClick={() => handleNotInterestedJob(job)}
+                        className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                        title="Not Interested - Remove this job"
+                      >
+                        <AlertCircle className="w-4 h-4" />
+                        <span className="text-xs">Not Interested</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -2,7 +2,7 @@
 // Separates gathering, filtering, scoring, verification, and presentation
 
 import { JobPosting } from './jobScanner'
-import { searchAllJobBoards } from './jobBoardIntegrations'
+import { gatherAllSecurityJobs as gatherJobs, applyBasicFilters as applyFilters } from './jobBoardIntegrations'
 import { smartMatch } from './smartMatcher'
 import { verifyAndEnrichJobLink } from './linkVerifier'
 
@@ -23,32 +23,13 @@ export interface PipelineResults {
 }
 
 /**
- * PHASE 1: Gather ALL security jobs with maximum coverage
+ * PHASE 1: Gather ALL security jobs with maximum coverage (PURE DATA DUMP)
  */
-async function gatherAllSecurityJobs(resumeContent: string, location: string): Promise<JobPosting[]> {
-  console.log('🔍 PHASE 1: Gathering ALL security jobs with maximum coverage...')
+async function gatherAllSecurityJobs(resumeContent: string, location: string): Promise<{rawJobs: JobPosting[], rawCountsBySource: Record<string, number>}> {
+  console.warn('🚨 PHASE 1 GATHER: Starting pure data dump...')
   
-  const rawJobs = await searchAllJobBoards(resumeContent, location, {
-    // MAXIMUM COVERAGE - no filtering during gathering
-    linkedinPages: 10,        // Maximum pages
-    indeedPages: 10,         // Maximum pages
-    includeUSAJobs: true,
-    maxQueriesPerSource: 10, // Maximum queries per source
-    includeAdzuna: true,      // All sources enabled
-    includeSerpApi: true,
-    includeJSearch: true,
-    includeEmailAlerts: true
-  })
-  
-  console.log(`📊 PHASE 1 COMPLETE: ${rawJobs.length} raw jobs gathered`)
-  
-  // Log source breakdown
-  const sourceBreakdown = rawJobs.reduce((acc: Record<string, number>, job: any) => {
-    acc[job.source || 'unknown'] = (acc[job.source || 'unknown'] || 0) + 1
-    return acc
-  }, {})
-  
-  console.log('📊 Raw source breakdown:', sourceBreakdown)
+  // Use new Phase 1 data dump function from jobBoardIntegrations
+  const { rawJobs, rawCountsBySource } = await gatherJobs()
   
   // Add basic JobPosting structure to raw jobs
   const structuredJobs = rawJobs.map((job: any, index: number) => ({
@@ -66,7 +47,7 @@ async function gatherAllSecurityJobs(resumeContent: string, location: string): P
     scannedAt: new Date().toISOString()
   }))
   
-  return structuredJobs
+  return { rawJobs: structuredJobs, rawCountsBySource }
 }
 
 /**
@@ -495,8 +476,17 @@ export async function cleanJobScanPipeline(resumeContent: string, location: stri
   try {
     console.log('🔍 PHASE 1: About to gather all security jobs...')
     // PHASE 1: Gather all jobs
-    const rawJobs = await gatherAllSecurityJobs(resumeContent, location)
-    console.log(`✅ PHASE 1 RETURNED: ${rawJobs.length} raw jobs`)
+    // PHASE 1: PURE DATA DUMP
+    console.warn('🚨 PHASE 1: Starting pure data dump - no filters, maximum volume')
+    const { rawJobs, rawCountsBySource } = await gatherAllSecurityJobs(resumeContent, location)
+    
+    // PHASE 1 COMPLETE - Contract required logging
+    console.warn('🚨 PHASE 1 GATHER: COMPLETE')
+    console.warn('📊 RAW JOB COUNTS BY SOURCE:')
+    Object.entries(rawCountsBySource).forEach(([source, count]) => {
+      console.warn(`   ${source}: ${count} jobs`)
+    })
+    console.warn(`📊 Total raw jobs collected: ${rawJobs.length}`)
     
     if (rawJobs.length === 0) {
       console.error('🚨 PHASE 1 RETURNED 0 JOBS - Pipeline will fail')
@@ -504,25 +494,48 @@ export async function cleanJobScanPipeline(resumeContent: string, location: stri
     
     pipelineStats.phase1Raw = rawJobs.length
     
-    // PHASE 1.5: Normalize and deduplicate
-    const dedupedJobs = await normalizeAndDedupe(rawJobs)
-    pipelineStats.phase1_5Deduped = dedupedJobs.length
-    pipelineStats.duplicatesRemoved = rawJobs.length - dedupedJobs.length
-    
-    // PHASE 2: Basic filtering
-    const filteredJobs = await applyBasicFilters(dedupedJobs, location)
+    // PHASE 2: BASIC FILTERS
+    console.warn('🚨 PHASE 2: Starting basic filters - location, recency, job type')
+    const filteredJobs = await applyFilters(rawJobs, location, true)
     pipelineStats.phase2Filtered = filteredJobs.length
     
-    // PHASE 3: Resume scoring
-    const scoredJobs = await scoreAgainstResume(filteredJobs, resumeContent)
+    // PHASE 2 COMPLETE - Contract required logging
+    console.warn(`📊 PHASE 2 OUTPUT: ${filteredJobs.length} jobs after filtering`)
+    
+    // PHASE 3: RESUME SCORING
+    console.warn('🚨 PHASE 3: Starting resume scoring - smart matching')
+    const scoredJobs = await scoreAgainstResume(filteredJobs as any[], resumeContent)
     pipelineStats.phase3Scored = scoredJobs.length
     
-    // PHASE 4: URL verification
-    const verifiedJobs = await verifyUrls(scoredJobs)
+    // PHASE 3 COMPLETE - Contract required logging
+    const scoreDistribution = scoredJobs.reduce((acc: Record<string, number>, job: any) => {
+      const score = job.matchScore || 0
+      let bucket = '0-20'
+      if (score >= 80) bucket = '80-100'
+      else if (score >= 60) bucket = '60-80'
+      else if (score >= 40) bucket = '40-60'
+      else if (score >= 20) bucket = '20-40'
+      acc[bucket] = (acc[bucket] || 0) + 1
+      return acc
+    }, {})
+    
+    console.warn('📊 SCORE DISTRIBUTION:')
+    Object.entries(scoreDistribution).forEach(([bucket, count]) => {
+      console.warn(`   ${bucket}: ${count} jobs`)
+    })
+    
+    // PHASE 4: URL VERIFICATION
+    console.warn('🚨 PHASE 4: Starting URL verification - only for scored jobs')
+    const verifiedJobs = await verifyUrls(scoredJobs as any[])
     pipelineStats.phase4Verified = verifiedJobs.length
     
-    // PHASE 5: Final sorting
-    const finalResults = await finalSorting(verifiedJobs)
+    // PHASE 4 COMPLETE - Contract required logging
+    const verifiedCount = verifiedJobs.filter(job => (job as any).verifiedAt).length
+    const unverifiedCount = verifiedJobs.length - verifiedCount
+    console.warn(`📊 VERIFICATION RESULTS: ${verifiedCount} verified, ${unverifiedCount} unverified`)
+    
+    // PHASE 5: FINAL SORTING
+    const finalResults = await finalSorting(verifiedJobs as any[])
     pipelineStats.phase5Final = finalResults.allJobs.length
     
     // Calculate source breakdown for final results

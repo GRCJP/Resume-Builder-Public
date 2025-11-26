@@ -65,7 +65,7 @@ export default function JobScanner({ resumeContent }: JobScannerProps) {
 
     setIsScanning(true)
     try {
-      const results = await scanJobBoards(resumeContent, config)
+      const results = await scanJobBoards(resumeContent, config.locations?.[0] || 'Remote', config)
       setScanResults(results)
       setLastScanTime(results.lastScanTime)
       
@@ -254,7 +254,7 @@ export default function JobScanner({ resumeContent }: JobScannerProps) {
                   Excellent Matches (90%+) - {scanResults.highMatches.length}
                 </h3>
                 <div className="space-y-3">
-                  {scanResults.highMatches.map(job => renderJobCard(job))}
+                  {scanResults.highMatches.map(job => renderJobCard(job as JobPosting))}
                 </div>
               </div>
             )}
@@ -267,7 +267,7 @@ export default function JobScanner({ resumeContent }: JobScannerProps) {
                   Good Matches (75-89%) - {scanResults.goodMatches.length}
                 </h3>
                 <div className="space-y-3">
-                  {scanResults.goodMatches.map(job => renderJobCard(job))}
+                  {scanResults.goodMatches.map(job => renderJobCard(job as JobPosting))}
                 </div>
               </div>
             )}

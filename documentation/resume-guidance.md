@@ -1,4 +1,5 @@
 # How to Build a Resume That Opens Doors
+*By AJ - GRC Engineering Club*
 
 This guidance represents the proven resume strategy that informed the development of the GRC Resume Builder tool.
 
@@ -131,3 +132,7 @@ This guidance transformed a 4-month job search with zero interviews into a strea
 - ✅ **Demonstrates engineering mindset** through the tool itself
 
 **Your resume isn't just a document - it's your first engineering deliverable.**
+
+---
+
+*Special thanks to AJ for providing the foundational guidance that made this tool possible.*

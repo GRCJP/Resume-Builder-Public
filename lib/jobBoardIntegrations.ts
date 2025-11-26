@@ -558,643 +558,367 @@ function cleanHtml(html: string): string {
     .trim()
 }
 
-/**
- * Search all job boards with resume content, pagination, and verification
- * Runs multiple queries per source for maximum coverage
+ /**
+ * Search all job boards using static GRC taxonomy (broad net approach)
+ * Resume is used for SCORING jobs, not generating search queries
+ * Runs multiple taxonomy terms per source for maximum coverage
  */
-export async function searchAllJobBoards(
-  resumeContent: string,
-  location: string,
-  options: {
-    linkedinPages?: number
-    indeedPages?: number
-    includeUSAJobs?: boolean
-    maxQueriesPerSource?: number
-    includeAdzuna?: boolean
-    includeSerpApi?: boolean
-    includeJSearch?: boolean
-    includeEmailAlerts?: boolean
-    experimentalSources?: string[]
-  } = {}
-): Promise<Partial<JobPosting>[]> {
-  const { linkedinPages = 2, indeedPages = 2, includeUSAJobs = true, maxQueriesPerSource = 3, includeAdzuna = true, includeSerpApi = true, includeJSearch = true, includeEmailAlerts = false } = options
+// ================================================================
+// PHASE 1: PURE DATA DUMP - Gather massive pool from all sources
+export async function gatherAllSecurityJobs(): Promise<{
+  rawJobs: Partial<JobPosting>[]
+  rawCountsBySource: Record<string, number>
+  failedSources: string[]
+}> {
+  console.warn('🚨 PHASE 1 GATHER: STARTING PURE DATA DUMP FROM ALL SOURCES')
   
-  console.log('🔍 Starting multi-source job search with resume analysis...')
-  console.log(`📊 Options: linkedinPages=${linkedinPages}, indeedPages=${indeedPages}, includeUSAJobs=${includeUSAJobs}, includeAdzuna=${includeAdzuna}, includeSerpApi=${includeSerpApi}, includeJSearch=${includeJSearch}, includeEmailAlerts=${includeEmailAlerts}`)
+  // PREFLIGHT CHECK - Validate all credentials before starting
+  console.warn('🔍 PHASE 1 PREFLIGHT: Checking credentials...')
+  try {
+    const preflightRes = await fetch('/api/preflight')
+    const preflight = await preflightRes.json()
+    
+    if (!preflight.ok) {
+      console.error('❌ PREFLIGHT FAILED:', preflight.errors)
+      throw new Error(`Preflight failed: ${preflight.errors.join(', ')}`)
+    }
+    
+    console.warn('✅ PREFLIGHT PASSED: All credentials validated')
+  } catch (error) {
+    console.error('🚨 PREFLIGHT ERROR:', error)
+    throw new Error(`Preflight check failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+      
+  // Add global timeout to prevent emergency timeouts
+  const controller = new AbortController()
+  const globalTimeoutId = setTimeout(() => {
+    controller.abort()
+    console.error('🚨 EMERGENCY: Global scan timeout after 5 minutes - aborting!')
+  }, 300000) // 5 minute global timeout
+      
+  try {
+    const allRawJobs: Partial<JobPosting>[] = []
+    const rawCountsBySource: Record<string, number> = {}
+    const failedSources: string[] = []
+    
+    // TAXONOMY BUNDLES - 5-8 terms per bundle for API efficiency
+    const taxonomyBundles = [
+      // Bundle 1: GRC Core
+      ["GRC Analyst", "GRC Engineer", "Security Compliance", "Compliance Analyst", "Risk Analyst", "Risk Manager"],
+          
+      // Bundle 2: Audit & Controls  
+      ["Security Auditor", "IT Auditor", "Controls Analyst", "SOX", "Internal Controls", "Internal Auditor"],
+          
+      // Bundle 3: Privacy & Third Party
+      ["Privacy Analyst", "Data Privacy", "Third Party Risk", "Vendor Risk", "TPRM", "Vendor Management"],
+          
+      // Bundle 4: Federal & Regulated
+      ["FedRAMP", "RMF", "ATO", "POAM", "ISSO", "ISSE", "NIST 800-53"],
+          
+      // Bundle 5: General Cyber (high volume)
+      ["Cybersecurity Analyst", "Security Analyst", "Security Engineer", "Information Security", "IT Security"],
+          
+      // Bundle 6: Advanced Cyber
+      ["Information Assurance", "Cybersecurity Engineer", "Security Manager", "CISO", "Security Program Manager"]
+    ]
   
-  // Generate search queries from resume content
-  console.log('📝 Generating search queries...')
-  console.log('📝 Resume content length:', resumeContent.length)
-  console.log('📝 Resume content preview:', resumeContent.substring(0, 200) + '...')
+    console.warn(`📦 TAXONOMY: ${taxonomyBundles.length} bundles, 5-8 terms each`)
+    console.warn(`📊 Bundle 1 sample:`, taxonomyBundles[0])
   
-  const searchQueries = generateSearchQueries(resumeContent)
-  console.log(`📝 Generated ${searchQueries.length} search queries:`, searchQueries.slice(0, 5))
+    // PHASE 1: Execute all sources in parallel with bundled taxonomy
+    console.warn('🚀 PHASE 1: Starting parallel source execution...')
+    
+    const sourcePromises: Promise<{ source: string; jobs: Partial<JobPosting>[] }>[] = []
   
-  // Use more queries per source for maximum coverage
-  const limitedQueries = searchQueries.slice(0, maxQueriesPerSource)
-  console.log(`📝 Using ${limitedQueries.length} queries per source:`, limitedQueries)
-  
-  const allJobs: Partial<JobPosting>[] = []
-  let rawCount = 0
-  
-  console.log('🚀 Starting parallel source execution...')
-  
-  // Run all sources in parallel for speed
-  const sourcePromises: Array<Promise<{source: string, jobs: Partial<JobPosting>[]}>> = []
-  
-  // TIER 1: Adzuna - Aggregator API (always on)
-  if (includeAdzuna) {
-    console.log('📡 Adding Adzuna to parallel execution...')
-    console.log('🔍 ADZUNA CONFIG:', { queries: limitedQueries, location, maxPages: 5 })
+    // ADZUNA - Pure data dump with bundles
     sourcePromises.push(
       (async () => {
         try {
-          console.log(`🔍 Adzuna: Starting search with ${limitedQueries.length} queries...`)
-          console.log(`🔍 Adzuna: Calling searchAdzunaJobs...`)
-          const adzunaResults = await searchAdzunaJobs(limitedQueries, location, 5) // Reduced for speed
-          console.log(`✅ Adzuna: COMPLETE - ${adzunaResults.length} jobs from ${limitedQueries.length} queries`)
-          if (adzunaResults.length === 0) {
-            console.warn(`⚠️ Adzuna returned 0 jobs - check API credentials and logs above`)
-          }
-          return { source: 'adzuna', jobs: adzunaResults }
+          console.warn('📡 PHASE 1 ADZUNA: Starting bundled data dump...')
+          const { searchAdzunaJobs } = await import('./adzunaAPI')
+          const adzunaJobs = await searchAdzunaJobs(taxonomyBundles, 5) // 5 pages per bundle
+          console.warn(`✅ PHASE 1 ADZUNA: ${adzunaJobs.length} raw jobs collected`)
+          return { source: 'adzuna', jobs: adzunaJobs }
         } catch (error) {
-          console.error('❌ Adzuna search failed:', error)
+          console.error('❌ PHASE 1 ADZUNA FAILED:', error)
+          // Let server-side API routes handle credential errors
           return { source: 'adzuna', jobs: [] }
         }
       })()
     )
-  } else {
-    console.warn('⚠️ Adzuna is DISABLED - includeAdzuna=false')
-  }
   
-  // TIER 1: SerpApi - Google Jobs API (always on)
-  if (includeSerpApi) {
-    console.log('📡 Adding SerpApi to parallel execution...')
-    sourcePromises.push(
-      (async () => {
-        try {
-          console.log(`🔍 SerpApi: Starting search with ${limitedQueries.length} queries...`)
-          const serpApiResults = await searchSerpApiJobs(limitedQueries, location, 5)
-          console.log(`✅ SerpApi: COMPLETE - ${serpApiResults.length} jobs from ${limitedQueries.length} queries`)
-          return { source: 'serpapi', jobs: serpApiResults }
-        } catch (error) {
-          console.error('❌ SerpApi search failed:', error)
-          return { source: 'serpapi', jobs: [] }
+  // EMAIL ALERTS - Gather from Gmail job alert emails
+  sourcePromises.push(
+    (async () => {
+      try {
+        console.warn(' PHASE 1 EMAIL ALERTS: Starting Gmail job extraction...')
+        
+        const { gatherEmailAlertJobs } = await import('./gmailFetcher')
+        const emailJobs = await gatherEmailAlertJobs()
+        
+        console.warn(` PHASE 1 EMAIL ALERTS: ${emailJobs.length} jobs extracted from Gmail`)
+        return { source: 'email', jobs: emailJobs }
+      } catch (error) {
+        console.error(' PHASE 1 EMAIL ALERTS FAILED:', error)
+        
+        if (error instanceof Error && error.message.includes('Missing env var')) {
+          console.warn(' EMAIL ALERTS: Disabled. Missing Google OAuth credentials')
+          console.warn('   Required: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_REFRESH_TOKEN')
         }
-      })()
-    )
-  }
-  
-  // TIER 1: JSearch - Job Search API (always on)
-  if (includeJSearch) {
-    console.log('📡 Adding JSearch to parallel execution...')
-    console.log('🔍 JSEARCH CONFIG:', { queries: limitedQueries, location, maxPages: 2 })
-    sourcePromises.push(
-      (async () => {
-        try {
-          console.log(`🔍 JSearch: Starting search with ${limitedQueries.length} queries...`)
-          console.log(`🔍 JSearch: Calling searchJSearchJobs...`)
-          const jsearchResults = await searchJSearchJobs(limitedQueries, location, 2) // Conservative: 2 pages
-          console.log(`✅ JSearch: COMPLETE - ${jsearchResults.length} jobs from ${limitedQueries.length} queries`)
-          if (jsearchResults.length === 0) {
-            console.warn(`⚠️ JSearch returned 0 jobs - check API credentials and logs above`)
-          }
-          return { source: 'jsearch', jobs: jsearchResults }
-        } catch (error) {
-          console.error('❌ JSearch search failed:', error)
-          
-          // Check if it's a subscription issue and handle gracefully
-          if (error instanceof Error && error.message.includes('subscription')) {
-            console.warn('⚠️ JSearch subscription issue - skipping this source')
-            return { source: 'jsearch', jobs: [] }
-          }
-          
-          return { source: 'jsearch', jobs: [] }
-        }
-      })()
-    )
-  } else {
-    console.warn('⚠️ JSearch is DISABLED - includeJSearch=false')
-  }
-  
-  // TIER 1: USAJobs - Federal cybersecurity roles (always on)
-  if (includeUSAJobs) {
-    console.log('📡 Adding USAJobs to parallel execution...')
-    sourcePromises.push(
-      (async () => {
-        try {
-          console.log(`🔍 USAJobs: Searching GRC federal jobs...`)
-          const usajobsResults = await searchFederalGRCJobs()
-          
-          // Transform USAJob objects to JobPosting interface
-          const transformedJobs = usajobsResults.map(job => ({
-            id: `usajobs-${job.id}`,
-            title: job.title,
-            company: job.organization,
-            location: job.location,
-            description: job.description,
-            url: job.url,
-            source: 'usajobs' as const, // USAJobs federal source
-            postedDate: job.posted,
-            salary: job.salary ? `$${job.salary.min.toLocaleString()} - $${job.salary.max.toLocaleString()}` : undefined,
-            remote: job.remote,
-            matchScore: 0, // Will be calculated later
-            scannedAt: new Date().toISOString()
-          }))
-          
-          console.log(`✅ USAJobs: ${transformedJobs.length} jobs`)
-          return { source: 'usajobs', jobs: transformedJobs }
-        } catch (error) {
-          console.error('❌ USAJobs search failed:', error)
-          return { source: 'usajobs', jobs: [] }
-        }
-      })()
-    )
-  }
-  
-  // TIER 1: Email Alerts - Job alert emails from Gmail
-  if (includeEmailAlerts) {
-    console.log('📡 Adding Email Alerts to parallel execution...')
-    sourcePromises.push(
-      (async () => {
-        try {
-          console.log(`📧 Email Alerts: Fetching jobs from Gmail...`)
-          const { gmailFetcher } = await import('./gmailFetcher')
-          
-          // Extract jobs from emails (last 7 days)
-          const emailJobs = await gmailFetcher.extractJobsFromEmails(7)
-          
-          // Transform email jobs to JobPosting interface
-          const transformedJobs = emailJobs.map(job => ({
-            id: `email-${job.id}`,
-            title: job.title,
-            company: job.company,
-            location: job.location,
-            description: job.description,
-            url: job.url,
-            source: 'emailAlerts' as const,
-            postedDate: job.postedDate || new Date().toISOString(),
-            salary: job.salary,
-            remote: job.remote,
-            matchScore: 0, // Will be calculated later
-            scannedAt: new Date().toISOString()
-          }))
-          
-          console.log(`✅ Email Alerts: ${transformedJobs.length} jobs`)
-          return { source: 'emailAlerts', jobs: transformedJobs }
-        } catch (error) {
-          console.error('❌ Email Alerts search failed:', error)
-          return { source: 'emailAlerts', jobs: [] }
-        }
-      })()
-    )
-  }
-  
-  // Only add scrapers if experimental mode is enabled
-  const experimentalSources = options.experimentalSources || []
-  
-  if (experimentalSources.includes('linkedin')) {
-    console.log('📡 Adding LinkedIn (experimental) to parallel execution...')
-    sourcePromises.push(
-      (async () => {
-        try {
-          console.log(`🔍 LinkedIn: Searching ${limitedQueries.length} queries × ${linkedinPages} pages...`)
-          const linkedinResults = await searchLinkedInJobs(limitedQueries, location, linkedinPages)
-          console.log(`✅ LinkedIn: ${linkedinResults.length} jobs from ${limitedQueries.length} queries`)
-          return { source: 'linkedin', jobs: linkedinResults }
-        } catch (error) {
-          console.error('❌ LinkedIn search failed:', error)
-          return { source: 'linkedin', jobs: [] }
-        }
-      })()
-    )
-  }
-  
-  if (experimentalSources.includes('indeed')) {
-    console.log('📡 Adding Indeed (experimental) to parallel execution...')
-    sourcePromises.push(
-      (async () => {
-        try {
-          console.log(`🔍 Indeed: Searching ${limitedQueries.length} queries × ${indeedPages} pages...`)
-          const indeedResults = await searchIndeedJobs(limitedQueries, location, indeedPages)
-          console.log(`✅ Indeed: ${indeedResults.length} jobs from ${limitedQueries.length} queries`)
-          return { source: 'indeed', jobs: indeedResults }
-        } catch (error) {
-          console.error('❌ Indeed search failed:', error)
-          return { source: 'indeed', jobs: [] }
-        }
-      })()
-    )
-  }
-  
-  console.log(`📊 Waiting for ${sourcePromises.length} sources to complete...`)
-  
-  // Wait for all sources to complete with timeout and detailed logging
-  console.log('⏱️ Starting Promise.race with 3-minute timeout...')
-  const startTime = Date.now()
-  
-  const sourceResults = await Promise.race([
-    Promise.allSettled(sourcePromises),
-    new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        const elapsed = Date.now() - startTime
-        console.error(`🚨 SOURCE TIMEOUT after ${elapsed}ms - sources stuck`)
-        reject(new Error('Source timeout'))
-      }, 180000) // 3 minutes
-    })
-  ])
-  
-  const elapsed = Date.now() - startTime
-  console.log(`✅ All sources completed in ${elapsed}ms, collecting results...`)
-  
-  // Track source counts for detailed logging
-  const sourceCounts: Record<string, number> = {}
-  
-  // Collect all jobs from successful sources
-  sourceResults.forEach((result: PromiseSettledResult<{source: string, jobs: Partial<JobPosting>[]}>, index: number) => {
-    if (result.status === 'fulfilled' && result.value) {
-      const sourceName = result.value.source
-      const jobCount = result.value.jobs.length
-      
-      sourceCounts[sourceName] = jobCount
-      
-      console.log(`📊 Source ${index + 1} (${sourceName}): ${jobCount} jobs`)
-      if (jobCount > 0) {
-        console.log(`📊 Sample job from ${sourceName}:`, {
-          title: result.value.jobs[0].title,
-          company: result.value.jobs[0].company,
-          url: result.value.jobs[0].url
-        })
+        
+        // Don't crash the scan - return empty array
+        return { source: 'email', jobs: [] }
       }
-      allJobs.push(...result.value.jobs)
-      rawCount += jobCount
-    } else {
-      console.warn(`⚠️ Source ${index + 1} failed or was rejected`)
-      if (result.status === 'rejected') {
-        console.error(`❌ Source ${index + 1} rejection reason:`, result.reason)
+    })()
+  )
+  
+  // USAJOBS - Pure data dump (federal source)
+  sourcePromises.push(
+    (async () => {
+      try {
+        console.warn(' PHASE 1 USAJOBS: Starting federal data dump...')
+        const { searchUSAJobsDataDump } = await import('./usajobsAPI')
+        const usajobsResults = await searchUSAJobsDataDump() // No filters for data dump
+        console.warn(`✅ PHASE 1 USAJOBS: ${usajobsResults.length} raw jobs collected`)
+        return { source: 'usajobs', jobs: usajobsResults }
+      } catch (error) {
+        console.error('❌ PHASE 1 USAJOBS FAILED:', error)
+        // Let server-side API routes handle credential errors
+        return { source: 'usajobs', jobs: [] }
+      }
+    })()
+  )
+  
+  // SERPAPI - Pure data dump with bundled taxonomy
+  sourcePromises.push(
+    (async () => {
+      try {
+        console.warn('🔍 PHASE 1 SERPAPI: Starting bundled data dump...')
+        
+        // Convert taxonomy bundles to simple queries for SerpApi
+        const serpQueries = taxonomyBundles.flat().slice(0, 8) // Use first 8 terms
+        
+        const { searchSerpApiJobs } = await import('./serpapiAPI') // CORRECT: Import from serpapiAPI
+        const serpJobs: Partial<JobPosting>[] = []
+        for (const query of serpQueries) {
+          try {
+            console.warn(`📄 SerpApi: Query "${query}"...`)
+            const results = await searchSerpApiJobs([query], '', 2) // No location filter
+            serpJobs.push(...results)
+            console.warn(`✅ SerpApi: ${results.length} jobs for "${query}"`)
+          } catch (err) {
+            console.warn(`❌ SerpApi query "${query}" failed:`, err)
+            // Let server-side API routes handle credential errors
+          }
+        }
+        
+        console.warn(`✅ PHASE 1 SERPAPI: ${serpJobs.length} raw jobs collected`)
+        return { source: 'serpapi', jobs: serpJobs }
+      } catch (error) {
+        console.error('❌ PHASE 1 SERPAPI FAILED:', error)
+        // Let server-side API routes handle credential errors
+        return { source: 'serpapi', jobs: [] }
+      }
+    })()
+  )
+  
+  // JSEARCH - Pure data dump with bundled taxonomy
+  sourcePromises.push(
+    (async () => {
+      try {
+        console.warn('🔍 PHASE 1 JSEARCH: Starting bundled data dump...')
+        
+        // Convert taxonomy bundles to simple queries for JSearch
+        const jsearchQueries = taxonomyBundles.flat().slice(0, 8) // Use first 8 terms
+        
+        const { searchJSearchJobs } = await import('./jsearchAPI') // CORRECT: Import from jsearchAPI
+        const jsearchJobs: Partial<JobPosting>[] = []
+        for (const query of jsearchQueries) {
+          try {
+            console.warn(`📄 JSearch: Query "${query}"...`)
+            const results = await searchJSearchJobs([query], '', 2) // No location filter
+            jsearchJobs.push(...results)
+            console.warn(`✅ JSearch: ${results.length} jobs for "${query}"`)
+          } catch (err) {
+            console.warn(`❌ JSearch query "${query}" failed:`, err)
+            // Let server-side API routes handle credential errors
+          }
+        }
+        
+        console.warn(`✅ PHASE 1 JSEARCH: ${jsearchJobs.length} raw jobs collected`)
+        return { source: 'jsearch', jobs: jsearchJobs }
+      } catch (error) {
+        console.error('❌ PHASE 1 JSEARCH FAILED:', error)
+        // Let server-side API routes handle credential errors
+        return { source: 'jsearch', jobs: [] }
+      }
+    })()
+  )
+  
+  // Wait for ALL Phase 1 sources to complete
+  console.warn('⏳ PHASE 1: Waiting for ALL sources to complete...')
+  const sourceResults = await Promise.all(sourcePromises) // All 5 sources: adzuna, email, serpapi, jsearch, usajobs
+  
+  // Merge all raw results and track failed sources
+    for (const result of sourceResults) {
+      allRawJobs.push(...result.jobs)
+      rawCountsBySource[result.source] = result.jobs.length
+      
+      // Track sources that returned 0 jobs (treated as failure)
+      if (result.jobs.length === 0) {
+        failedSources.push(result.source)
+        console.warn(`[PHASE 1] ${result.source} returned 0 jobs. Treating as retrieval failure.`)
       }
     }
+  
+  // DEDUPLICATION (only after gather)
+  console.warn(' PHASE 1: Deduplicating raw jobs...')
+  const deduplicatedJobs = deduplicateJobs(allRawJobs)
+  const duplicateCount = allRawJobs.length - deduplicatedJobs.length
+  
+  // PHASE 1 COMPLETE - Logging required by contract
+  console.warn(' PHASE 1 GATHER: COMPLETE')
+  console.warn(' RAW JOB COUNTS BY SOURCE:')
+  Object.entries(rawCountsBySource).forEach(([source, count]) => {
+    console.warn(`  ${source}: ${count} jobs`)
   })
+  console.warn(` TOTAL RAW JOBS: ${allRawJobs.length} (before deduplication)`)
+  console.warn(` DEDUPLICATED JOBS: ${deduplicatedJobs.length} (removed ${duplicateCount} duplicates)`)
   
-  console.log(`📊 RAW JOB COUNTS BY SOURCE:`, sourceCounts)
-  console.log(`📊 Total raw jobs collected: ${rawCount} from ${sourceResults.length} sources`)
-  
-  // DEBUG: Log first 3 jobs from each source
-  Object.entries(sourceCounts).forEach(([source, count]) => {
-    if (count > 0) {
-      const sourceJobs = allJobs.filter(j => j.source === source).slice(0, 3)
-      console.log(`🔍 DEBUG: Sample ${source} jobs:`, sourceJobs.map(j => ({
-        title: j.title,
-        company: j.company,
-        source: j.source,
-        hasDescription: !!j.description,
-        descLength: j.description?.length || 0
-      })))
-    }
-  })
-  
-  // THRESHOLD-BASED FALLBACK LOGIC
-  const MIN_RAW = 10  // Lowered from 60 to prevent premature fallback during debugging
-  const MIN_GOOD = 5  // Lowered from 25 to prevent premature fallback during debugging
-  const GOOD_THRESHOLD = 55
-  
-  console.log(`📊 Fallback Thresholds: MIN_RAW=${MIN_RAW}, MIN_GOOD=${MIN_GOOD}, GOOD_THRESHOLD=${GOOD_THRESHOLD}`)
-  
-  let shouldAddFallback = false
-  let fallbackReason = ''
-  
-  if (rawCount < MIN_RAW) {
-    shouldAddFallback = true
-    fallbackReason = `Raw jobs (${rawCount}) below threshold (${MIN_RAW})`
-    console.warn(`⚠️ FALLBACK TRIGGERED: ${fallbackReason}`)
-  } else {
-    console.log(`✅ Raw job count (${rawCount}) meets threshold (${MIN_RAW})`)
-  }
-  
-  // Quick score check for good matches
-  if (!shouldAddFallback) {
-    const quickScores = allJobs.slice(0, 20).map(job => ({
-      ...job,
-      matchScore: quickScoreJob(job, resumeContent)
-    }))
-    const goodMatches = quickScores.filter(j => j.matchScore >= GOOD_THRESHOLD).length
+  clearTimeout(globalTimeoutId)
     
-    if (goodMatches < MIN_GOOD) {
-      shouldAddFallback = true
-      fallbackReason = `Good matches (${goodMatches}) below threshold (${MIN_GOOD})`
+    // Show failed sources in UI
+    if (failedSources.length > 0) {
+      console.warn(`⚠️ PHASE 1 SOURCES WITH ISSUES: ${failedSources.join(', ')}`)
     }
     
-    console.log(`📊 Quick assessment: ${goodMatches} jobs >= ${GOOD_THRESHOLD} score`)
-  }
+    return { rawJobs: deduplicatedJobs, rawCountsBySource, failedSources }
   
-  // ADD FALLBACK JOBS IF NEEDED
-  if (shouldAddFallback) {
-    console.log(`🔄 Adding fallback jobs: ${fallbackReason}`)
-    
-    const fallbackJobs = generateCuratedGRCJobs(searchQueries)
-    
-    // MERGE AND RERANK
-    allJobs.push(...fallbackJobs)
-    console.log(`📊 Added ${fallbackJobs.length} curated fallback jobs`)
-  }
-  
-  console.log(`📊 Total jobs found: ${allJobs.length}`)
-  
-  // Quick URL verification (only 5 jobs for speed)
-  const jobsToVerify = Math.min(5, allJobs.length)
-  console.log(`🔍 Verifying ${jobsToVerify}/${allJobs.length} job URLs (reduced for speed)...`)
-  
-  const { batchVerifyJobs } = await import('./linkVerifier')
-  const verifiedJobs = await batchVerifyJobs(allJobs.slice(0, jobsToVerify), 1) // Only topN parameter
-  const remainingJobs = allJobs.slice(jobsToVerify)
-  
-  // Combine verified and remaining jobs
-  const finalJobs = [...verifiedJobs, ...remainingJobs].filter(Boolean)
-  console.log(`✅ Final job count: ${finalJobs.length} (${verifiedJobs.length} verified + ${remainingJobs.length} unverified)`)
-  
-  // STRICT DETAIL PAGE VALIDITY GATE - ONLY real jobs with actual content
-  const realJobs = finalJobs.filter(j => {
-    // Check for basic job requirements
-    const hasTitle = j.title && j.title.length > 5
-    const hasCompany = j.company && j.company.length > 2
-    const hasDescription = j.description && j.description.length > 50
-    const hasValidLinkStatus = (!(j as any).linkStatus || (j as any).linkStatus !== 404) && (!(j as any).linkStatus || (j as any).linkStatus !== 410)
-    
-    // DATE FILTERING - Only jobs from last 5 days
-    let isRecent = true
-    if (j.postedDate) {
-      const jobDate = new Date(j.postedDate)
-      const fiveDaysAgo = new Date(Date.now() - (5 * 24 * 60 * 60 * 1000))
-      isRecent = jobDate >= fiveDaysAgo
+  } catch (error) {
+    clearTimeout(globalTimeoutId)
+    console.error(' PHASE 1 CRITICAL ERROR:', error)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Scan timed out after 5 minutes - try reducing the number of queries or pages')
     }
-    
-    // RELEVANCE FILTERING - Check for GRC-related keywords
-    const title = (j.title || '').toLowerCase()
-    const description = (j.description || '').toLowerCase()
-    const company = (j.company || '').toLowerCase()
-    
-    const grcKeywords = [
-      'grc', 'governance', 'risk', 'compliance', 'audit', 'security',
-      'nist', 'soc 2', 'soc2', 'iso 27001', 'iso27001', 'fedramp', 'cmmc',
-      'policy', 'controls', 'framework', 'assessment', 'cybersecurity',
-      'information security', 'it compliance', 'regulatory', 'sox', 'hipaa',
-      'pci dss', 'gdpr', 'privacy', 'data protection'
-    ]
-    
-    const hasRelevantKeyword = grcKeywords.some(keyword => 
-      title.includes(keyword) || 
-      description.includes(keyword) || 
-      company.includes(keyword)
-    )
-    
-    // EXCLUDE IRRELEVANT JOBS
-    const excludeKeywords = [
-      'software engineer', 'developer', 'programmer', 'frontend', 'backend',
-      'full stack', 'devops', 'sre', 'product manager', 'sales', 'marketing',
-      'graphic designer', 'ui/ux', 'data scientist', 'machine learning',
-      'nurse', 'doctor', 'medical', 'teacher', 'professor', 'writer'
-    ]
-    
-    const hasExcludeKeyword = excludeKeywords.some(keyword => 
-      title.includes(keyword) || description.includes(keyword)
-    )
-    
-    return hasTitle && hasCompany && hasDescription && hasValidLinkStatus && 
-           isRecent && hasRelevantKeyword && !hasExcludeKeyword
-  })
-  
-  console.log(`📊 Verification Results: ${allJobs.length} raw → ${finalJobs.length} verified → ${realJobs.length} real detail pages`)
-  
-  // LOG FILTERING DETAILS
-  const oldJobs = finalJobs.filter(j => {
-    if (j.postedDate) {
-      const jobDate = new Date(j.postedDate)
-      const fiveDaysAgo = new Date(Date.now() - (5 * 24 * 60 * 60 * 1000))
-      return jobDate < fiveDaysAgo
-    }
-    return false
-  })
-  
-  const irrelevantJobs = finalJobs.filter(j => {
-    const title = (j.title || '').toLowerCase()
-    const description = (j.description || '').toLowerCase()
-    
-    const grcKeywords = [
-      'grc', 'governance', 'risk', 'compliance', 'audit', 'security',
-      'nist', 'soc 2', 'soc2', 'iso 27001', 'iso27001', 'fedramp', 'cmmc',
-      'policy', 'controls', 'framework', 'assessment', 'cybersecurity',
-      'information security', 'it compliance', 'regulatory', 'sox', 'hipaa',
-      'pci dss', 'gdpr', 'privacy', 'data protection'
-    ]
-    
-    const excludeKeywords = [
-      'software engineer', 'developer', 'programmer', 'frontend', 'backend',
-      'full stack', 'devops', 'sre', 'product manager', 'sales', 'marketing',
-      'graphic designer', 'ui/ux', 'data scientist', 'machine learning',
-      'nurse', 'doctor', 'medical', 'teacher', 'professor', 'writer'
-    ]
-    
-    const hasRelevantKeyword = grcKeywords.some(keyword => 
-      title.includes(keyword) || description.includes(keyword)
-    )
-    
-    const hasExcludeKeyword = excludeKeywords.some(keyword => 
-      title.includes(keyword) || description.includes(keyword)
-    )
-    
-    return !hasRelevantKeyword || hasExcludeKeyword
-  })
-  
-  console.log(`🔍 Filtering Summary:`)
-  console.log(`  📅 Old jobs (>5 days): ${oldJobs.length}`)
-  console.log(`  🎯 Irrelevant jobs: ${irrelevantJobs.length}`)
-  console.log(`  ✅ Relevant recent jobs: ${realJobs.length}`)
-  
-  if (oldJobs.length > 0) {
-    console.log(`  📅 Sample old jobs:`, oldJobs.slice(0, 3).map(j => ({ title: j.title, postedDate: j.postedDate })))
+    throw error
   }
-  
-  if (irrelevantJobs.length > 0) {
-    console.log(`  ❌ Sample irrelevant jobs:`, irrelevantJobs.slice(0, 3).map(j => ({ title: j.title, company: j.company })))
-  }
-  
-  // ONLY SCORE AND DISPLAY REAL JOBS
-  const dedupedJobs = dedupeJobs(realJobs)
-  
-  // Final source health report
-  const finalSourceStats: Record<string, number> = {}
-  finalJobs.forEach(job => {
-    const source = job.source || 'unknown'
-    finalSourceStats[source] = (finalSourceStats[source] || 0) + 1
-  })
-  
-  console.log('📊 Final Jobs by Source:')
-  Object.entries(finalSourceStats).forEach(([source, count]) => {
-    console.log(`  ${source}: ${count} jobs displayed`)
-  })
-  console.log(`📊 Pipeline Summary: ${allJobs.length} raw → ${verifiedJobs.length} verified → ${realJobs.length} real → ${finalJobs.length} final jobs`)
-  
-  return finalJobs
 }
 
-/**
- * Quick job scoring for fallback assessment
- */
-function quickScoreJob(job: Partial<JobPosting>, resumeContent: string): number {
-  const title = (job.title || '').toLowerCase()
-  const description = (job.description || '').toLowerCase()
-  const resume = resumeContent.toLowerCase()
-  
-  let score = 0
-  
-  // Title keyword matches
-  if (title.includes('grc')) score += 15
-  if (title.includes('compliance')) score += 15
-  if (title.includes('risk')) score += 10
-  if (title.includes('security')) score += 10
-  if (title.includes('audit')) score += 10
-  
-  // Description keyword matches
-  if (description.includes('nist')) score += 10
-  if (description.includes('iso')) score += 10
-  if (description.includes('soc 2')) score += 10
-  if (description.includes('federal')) score += 5
-  
-  // Resume keyword overlap
-  const resumeWords = resume.split(/\s+/)
-  const descWords = description.split(/\s+/)
-  const overlap = resumeWords.filter(word => word.length > 3 && descWords.includes(word)).length
-  score += Math.min(overlap * 2, 20)
-  
-  return Math.min(score, 100)
-}
-
-/**
- * Enhanced deduplication with stronger key
- */
-export function dedupeJobs(jobs: Partial<JobPosting>[]): Partial<JobPosting>[] {
-  const seen = new Map<string, Partial<JobPosting>>()
+// Simple deduplication by title + company + location normalization
+function deduplicateJobs(jobs: Partial<JobPosting>[]): Partial<JobPosting>[] {
+  const seen = new Set<string>()
+  const unique: Partial<JobPosting>[] = []
   
   for (const job of jobs) {
-    // Normalize fields for dedupe key
-    const normalizedTitle = (job.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim()
-    const normalizedCompany = (job.company || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim()
-    const normalizedLocation = (job.location || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim()
-    const source = (job.source || '').toLowerCase()
+    // Only deduplicate if we have the required fields
+    if (!job.title || !job.company) continue
     
-    // Create day bucket from posted date
-    const postedDate = new Date(job.postedDate || Date.now())
-    const dayBucket = `${postedDate.getFullYear()}-${postedDate.getMonth()}-${postedDate.getDate()}`
+    const key = `${job.title.toLowerCase().trim()}|${job.company.toLowerCase().trim()}|${(job.location || '').toLowerCase().trim()}`
     
-    // Strong dedupe key
-    const dedupeKey = `${normalizedTitle}-${normalizedCompany}-${normalizedLocation}-${source}-${dayBucket}`
-    
-    const existing = seen.get(dedupeKey)
-    
-    // Keep the one with longer description
-    if (!existing || (job.description?.length || 0) > (existing.description?.length || 0)) {
-      seen.set(dedupeKey, job)
+    if (!seen.has(key)) {
+      seen.add(key)
+      unique.push(job)
     }
   }
   
-  const deduped = Array.from(seen.values())
-  console.log(`🔄 Deduplication: ${jobs.length} → ${deduped.length} jobs`)
-  
-  return deduped
+  return unique
 }
 
-/**
- * Generate curated GRC job opportunities for fallback
- */
-function generateCuratedGRCJobs(keywords: string[]): Partial<JobPosting>[] {
-  const baseJobs = [
-    {
-      id: `curated-grc-${Date.now()}-1`,
-      title: 'Senior GRC Analyst',
-      company: 'Microsoft',
-      location: 'Remote',
-      description: 'Leading GRC initiatives, NIST 800-53 compliance, and risk assessments for enterprise cloud services.',
-      url: 'https://careers.microsoft.com/us/en/search-results?q=GRC',
-      source: 'curated' as const,
-      postedDate: new Date().toISOString(),
-      salary: '$130,000 - $160,000',
-      remote: true
-    },
-    {
-      id: `curated-grc-${Date.now()}-2`,
-      title: 'Cybersecurity Compliance Manager',
-      company: 'Amazon Web Services',
-      location: 'Remote',
-      description: 'Managing AWS compliance programs, SOC 2, ISO 27001, and customer audit requests for cloud services.',
-      url: 'https://www.amazon.jobs/en/search?base_category=Cloud%20Operations',
-      source: 'curated' as const,
-      postedDate: new Date(Date.now() - 86400000).toISOString(),
-      salary: '$140,000 - $180,000',
-      remote: true
-    },
-    {
-      id: `curated-grc-${Date.now()}-3`,
-      title: 'IT Risk Manager',
-      company: 'JPMorgan Chase',
-      location: 'Hybrid - New York, NY',
-      description: 'Managing technology risk program, conducting risk assessments, and reporting to senior leadership.',
-      url: 'https://careers.jpmorgan.com/us/en/search-results',
-      source: 'curated' as const,
-      postedDate: new Date(Date.now() - 172800000).toISOString(),
-      salary: '$150,000 - $190,000',
-      remote: false
-    },
-    {
-      id: `curated-grc-${Date.now()}-4`,
-      title: 'Security Compliance Specialist',
-      company: 'Google',
-      location: 'Remote',
-      description: 'Supporting SOC 2, ISO 27001, and PCI DSS compliance for Google Cloud Platform services.',
-      url: 'https://careers.google.com/jobs/results',
-      source: 'curated' as const,
-      postedDate: new Date(Date.now() - 259200000).toISOString(),
-      salary: '$120,000 - $150,000',
-      remote: true
-    },
-    {
-      id: `curated-grc-${Date.now()}-5`,
-      title: 'FedRAMP Security Analyst',
-      company: 'Oracle',
-      location: 'Remote',
-      description: 'Leading FedRAMP authorization efforts, continuous monitoring, and security assessments for federal cloud services.',
-      url: 'https://jobs.oracle.com/en/us/',
-      source: 'curated' as const,
-      postedDate: new Date(Date.now() - 345600000).toISOString(),
-      salary: '$125,000 - $155,000',
-      remote: true
-    },
-    {
-      id: `curated-grc-${Date.now()}-6`,
-      title: 'Cloud Security Architect',
-      company: 'IBM',
-      location: 'Hybrid - Austin, TX',
-      description: 'Designing security frameworks for multi-cloud environments and leading security architecture reviews.',
-      url: 'https://careers.ibm.com/jobs/search',
-      source: 'curated' as const,
-      postedDate: new Date(Date.now() - 432000000).toISOString(),
-      salary: '$160,000 - $200,000',
-      remote: false
-    }
-  ]
+// ================================================================
+// PHASE 2: BASIC FILTERS - Location, recency, job type
+// ================================================================
+
+export async function applyBasicFilters(
+  rawJobs: Partial<JobPosting>[],
+  location: string,
+  remote: boolean = true
+): Promise<Partial<JobPosting>[]> {
   
-  // Filter jobs based on search queries to make them more relevant
-  if (keywords.length > 0) {
-    const queryLower = keywords.join(' ').toLowerCase()
-    return baseJobs.filter(job => {
-      const jobText = (job.title + ' ' + job.description).toLowerCase()
-      return queryLower.split(' ').some(keyword => 
-        jobText.includes(keyword) || 
-        keyword.includes('grc') || 
-        keyword.includes('compliance') ||
-        keyword.includes('security')
-      )
+  console.warn('� PHASE 2 FILTERS: Starting basic filtering...')
+  console.warn(`📊 Input: ${rawJobs.length} raw jobs`)
+  
+  // Location filter (if specified)
+  let filteredJobs = rawJobs
+  
+  if (location && location !== 'Remote') {
+    console.warn(`📍 Applying location filter: ${location}`)
+    filteredJobs = filteredJobs.filter(job => {
+      const jobLocation = (job.location || '').toLowerCase()
+      return jobLocation.includes(location.toLowerCase()) || 
+             jobLocation.includes('remote') ||
+             jobLocation.includes('united states') ||
+             jobLocation.includes('us')
     })
   }
   
-  return baseJobs
+  // Remote filter
+  if (remote) {
+    console.warn('🏠 Including remote opportunities...')
+    filteredJobs = filteredJobs.filter(job => {
+      const jobLocation = (job.location || '').toLowerCase()
+      return jobLocation.includes('remote') || 
+             !jobLocation.includes('in office') ||
+             job.title?.toLowerCase().includes('remote')
+    })
+  }
+  
+  // Recency filter (14 days)
+  const fourteenDaysAgo = new Date()
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14)
+  
+  console.warn(`📅 Applying recency filter: since ${fourteenDaysAgo.toISOString().split('T')[0]}`)
+  filteredJobs = filteredJobs.filter(job => {
+    const postedDate = new Date(job.postedDate || '')
+    return postedDate >= fourteenDaysAgo || !job.postedDate // Include if no date
+  })
+  
+  // Job type filter (security/GRC related)
+  console.warn('🔍 Applying security/GRC keyword filter...')
+  const securityKeywords = [
+    'security', 'cyber', 'grc', 'compliance', 'risk', 'audit', 
+    'governance', 'privacy', 'controls', 'iso', 'nist', 'sox',
+    'information security', 'it security', 'cybersecurity'
+  ]
+  
+  filteredJobs = filteredJobs.filter(job => {
+    const title = (job.title || '').toLowerCase()
+    const description = (job.description || '').toLowerCase()
+    
+    return securityKeywords.some(keyword => 
+      title.includes(keyword) || description.includes(keyword)
+    )
+  })
+  
+  console.warn(`📊 PHASE 2 OUTPUT: ${filteredJobs.length} jobs after filtering`)
+  
+  return filteredJobs
+}
+
+// ================================================================
+// BACKWARD COMPATIBILITY - Legacy function wrapper
+// ================================================================
+
+/**
+ * Legacy wrapper for backward compatibility
+ * Uses new Phase 1-4 architecture internally
+ */
+export async function searchAllJobBoards(
+  resumeContent: string,
+  location: string,
+  options: any = {}
+): Promise<Partial<JobPosting>[]> {
+  
+  // Use new Phase 1-4 architecture
+  const { rawJobs, failedSources } = await gatherAllSecurityJobs()
+  const filteredJobs = await applyBasicFilters(rawJobs, location, true)
+  
+  // Show toast for failed sources if any
+  if (failedSources.length > 0) {
+    console.warn(`⚠️ Some sources had issues: ${failedSources.join(', ')}`)
+    // TODO: Add UI toast here
+  }
+  
+  // TODO: Add Phase 3 scoring and Phase 4 verification here if needed
+  
+  return filteredJobs
 }

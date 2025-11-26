@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from "next/server"
 
 export async function GET(req: Request) {
   try {
@@ -7,76 +7,55 @@ export async function GET(req: Request) {
     const error = searchParams.get('error')
     
     if (error) {
-      console.error('❌ Gmail OAuth error:', error)
-      return NextResponse.redirect(
-        `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}?error=gmail_oauth_failed&reason=${error}`
-      )
+      console.error('❌ GMAIL CALLBACK: OAuth error:', error)
+      return NextResponse.json({
+        error: 'OAuth authorization failed',
+        details: error,
+        message: 'Please try the authorization process again'
+      }, { status: 400 })
     }
     
     if (!code) {
-      console.error('❌ Gmail OAuth: No authorization code received')
-      return NextResponse.redirect(
-        `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}?error=gmail_oauth_failed&reason=no_code`
-      )
+      console.error('❌ GMAIL CALLBACK: No authorization code received')
+      return NextResponse.json({
+        error: 'No authorization code',
+        message: 'Authorization code is required'
+      }, { status: 400 })
     }
     
-    // Exchange authorization code for access token
-    const tokenResponse = await exchangeCodeForToken(code)
+    console.warn('✅ GMAIL CALLBACK: Received authorization code')
     
-    if (!tokenResponse.access_token) {
-      console.error('❌ Gmail OAuth: Failed to get access token')
-      return NextResponse.redirect(
-        `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}?error=gmail_oauth_failed&reason=token_exchange_failed`
-      )
-    }
+    // Show the authorization code to the user
+    const html = `
+      <html>
+        <head><title>Gmail Authorization Successful</title></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+          <h2 style="color: #10b981;">✅ Gmail Authorization Successful!</h2>
+          <p><strong>Authorization Code:</strong></p>
+          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; word-break: break-all; font-family: monospace; margin: 20px 0;">
+            ${code}
+          </div>
+          <p><strong>Next Steps:</strong></p>
+          <ol>
+            <li>Copy the authorization code above</li>
+            <li>Go back to your terminal</li>
+            <li>Run: <code>curl "http://localhost:3000/api/gmail-auth?action=callback&code=YOUR_CODE"</code></li>
+            <li>Replace YOUR_CODE with the code you just copied</li>
+          </ol>
+          <p style="color: #6b7280; font-size: 14px;">You can close this window and return to your terminal.</p>
+        </body>
+      </html>
+    `
     
-    // Store tokens securely (in production, use a database)
-    // For now, we'll return them to the client to store in localStorage
-    const redirectUrl = new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000')
-    redirectUrl.searchParams.set('gmail_success', 'true')
-    redirectUrl.searchParams.set('access_token', tokenResponse.access_token)
-    redirectUrl.searchParams.set('refresh_token', tokenResponse.refresh_token || '')
-    
-    console.log('✅ Gmail OAuth successful')
-    return NextResponse.redirect(redirectUrl.toString())
+    return new Response(html, {
+      headers: { 'Content-Type': 'text/html' }
+    })
     
   } catch (error) {
-    console.error('❌ Gmail OAuth callback error:', error)
-    return NextResponse.redirect(
-      `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}?error=gmail_oauth_failed&reason=callback_error`
-    )
+    console.error('❌ GMAIL CALLBACK ERROR:', error)
+    return NextResponse.json({
+      error: 'Callback processing failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
-}
-
-async function exchangeCodeForToken(code: string) {
-  const clientId = process.env.GMAIL_CLIENT_ID
-  const clientSecret = process.env.GMAIL_CLIENT_SECRET
-  const redirectUri = process.env.GMAIL_REDIRECT_URI || 'http://localhost:3000/api/gmail-callback'
-  
-  if (!clientId || !clientSecret) {
-    throw new Error('Gmail OAuth credentials not configured')
-  }
-  
-  const tokenUrl = 'https://oauth2.googleapis.com/token'
-  
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code: code,
-      grant_type: 'authorization_code',
-      redirect_uri: redirectUri
-    })
-  })
-  
-  if (!response.ok) {
-    const errorData = await response.text()
-    throw new Error(`Token exchange failed: ${response.status} - ${errorData}`)
-  }
-  
-  return await response.json()
 }

@@ -6,81 +6,88 @@ export async function searchJSearchJobs(
   maxPages = 2
 ): Promise<Partial<JobPosting>[]> {
   const jobs: Partial<JobPosting>[] = []
-  const query = `${keywords.join(" OR ")} ${location || "remote"}` 
 
-  console.log(`🔍 JSearch: Searching "${query}" (${maxPages} pages)`)
+  console.warn(`🔍 JSearch: Using ${keywords.length} keywords, location: "${location || 'ALL'}"`)
 
   try {
-    // JSearch uses page numbers starting from 1
-    for (let page = 1; page <= maxPages; page++) {
-      const res = await fetch(
-        `/api/jsearch?query=${encodeURIComponent(query)}&page=${page}&num_pages=1&country=us` 
-      )
-      
-      console.log(`📡 JSearch: Page ${page} response status: ${res.status}`)
-      
-      if (!res.ok) {
-        const errorBody = await res.text()
-        console.error(`❌ JSearch: Page ${page} failed with status ${res.status}`)
-        console.error(`❌ JSearch: Response body:`, errorBody)
+    for (const keyword of keywords) {
+      try {
+        console.warn(`📄 JSearch: Query "${keyword}"...`)
         
-        try {
-          const errorData = JSON.parse(errorBody)
-          // Check for subscription issue
-          if (errorData.error?.includes('not subscribed') || errorData.subscriptionRequired) {
-            console.warn(`⚠️ JSearch API subscription required - skipping remaining pages`)
-            break
+        // Add timeout to prevent hanging
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+        
+        // Use ONLY JSearch route - NO CROSS WIRING
+        const res = await fetch(
+          `/api/jsearch?query=${encodeURIComponent(keyword)}&page=1&num_pages=1&country=us`,
+          { signal: controller.signal }
+        )
+        
+        clearTimeout(timeoutId)
+        
+        if (!res.ok) {
+          const errorText = await res.text()
+          console.warn(`⚠️ JSearch: Query "${keyword}" failed - ${res.status}: ${errorText}`)
+          
+          // If it's a credential error, show clear message
+          if (errorText.includes('credentials') || errorText.includes('key missing') || errorText.includes('unauthorized')) {
+            console.error('❌ JSearch credentials missing - check JSEARCH_RAPIDAPI_KEY in .env.local')
           }
-        } catch {
-          // Not JSON, just continue
+          continue
+        }
+
+        const data = await res.json()
+        
+        if (data.error) {
+          console.warn(`❌ JSearch: API error for "${keyword}": ${data.error}`)
+          continue
         }
         
-        console.warn(`⚠️ JSearch: Continuing to next page despite error...`)
-        continue
-      }
-
-      const data = await res.json()
-      
-      if (data.error) {
-        console.error(`❌ JSearch: Page ${page} API returned error:`, data.error)
-        console.warn(`⚠️ JSearch: Continuing to next page despite error...`)
-        continue
-      }
-
-      const results = data?.data || []
-      if (!results.length) {
-        console.log(`📄 JSearch page ${page}: No results`)
-        break
-      }
-
-      console.log(`📄 JSearch page ${page}: ${results.length} jobs`)
-
-      for (const r of results) {
-        jobs.push({
-          id: `jsearch-${r.job_id || r.job_title}-${page}`,
-          title: r.job_title,
-          company: r.employer_name || "Unknown Company",
-          location: r.job_location || location || "Remote",
-          url: r.job_apply_link, // job detail link
-          source: "jsearch" as any,
-          postedDate: r.job_posted_at_datetime_utc || new Date().toISOString(),
-          description: r.job_description || "",
-          salary: r.job_salary || r.job_min_salary || r.job_max_salary ? 
-            `${r.job_min_salary || ''} - ${r.job_max_salary || ''}`.trim() : undefined,
-          remote: r.job_is_remote
-        })
+        const results = data.data || []
+        
+        if (results.length > 0) {
+          console.warn(`✅ JSearch: ${results.length} jobs for "${keyword}"`)
+          
+          // Debug URLs
+          const urlCount = results.filter((job: any) => job.job_apply_link).length
+          console.warn(`🔗 JSearch: ${urlCount}/${results.length} jobs have URLs`)
+          
+          jobs.push(...results.map((job: any) => ({
+            id: job.job_id || `jsearch-${Date.now()}-${Math.random()}`,
+            title: job.job_title,
+            company: job.employer_name,
+            location: job.job_city || job.job_country,
+            description: job.job_description,
+            url: job.job_apply_link || `https://www.google.com/search?q=${encodeURIComponent(job.job_title + ' ' + job.employer_name + ' jobs')}`,
+            source: 'jsearch',
+            postedDate: job.job_posted_at_datetime_utc || new Date().toISOString(),
+            matchScore: 0,
+            salary: job.job_max_salary || job.job_min_salary ? `${job.job_min_salary}-${job.job_max_salary}` : undefined,
+            remote: job.job_is_remote || false,
+            scannedAt: new Date().toISOString()
+          }))) // Keep all jobs - descriptions matter most
+        } else {
+          console.warn(`📭 JSearch: No results for "${keyword}"`)
+        }
+        
+      } catch (err) {
+        console.warn(`❌ JSearch query "${keyword}" failed:`, err)
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.warn('⏰ JSearch query timed out after 10 seconds')
+        }
       }
     }
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`❌ JSearch fetch exception:`, errorMsg)
-    console.warn(`⚠️ JSearch: Returning ${jobs.length} jobs collected before error`)
+    console.error('❌ JSearch search failed:', error)
+    throw error
   }
 
-  console.log(`✅ JSearch: Found ${jobs.length} total jobs`)
+  console.warn(`✅ JSearch: TOTAL - ${jobs.length} jobs from ${keywords.length} queries`)
   
+  // Phase 1 rule: Don't swallow "all zero"
   if (jobs.length === 0) {
-    console.warn(`⚠️ JSearch: No jobs found - this may indicate an API issue`)
+    console.warn(`[PHASE 1] JSEARCH returned 0 jobs. Treating as retrieval failure.`)
   }
   
   return jobs

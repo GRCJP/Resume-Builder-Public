@@ -79,7 +79,7 @@ Multiple resume generation scripts that confuse the project's purpose.
 
 ### **📚 Consolidate Documentation:**
 Keep only essential docs in `/docs/`:
-- `resume-guidance.md` (foundational guidance)
+- `resume-guidance.md` (AJ's foundational guidance)
 - `community-showcase.md` (showcase strategy)
 
 ### **🗑️ Delete Completely:**

@@ -33,7 +33,7 @@ function isTrackerUrl(url: string): boolean {
 function isValidJob(job: Partial<JobPosting>): boolean {
   return !!job.description && 
          job.description.length > 50 && 
-         (job.linkStatus !== 404 && job.linkStatus !== 410)
+         ((job.linkStatus == null) || (job.linkStatus !== 404 && job.linkStatus !== 410))
 }
 
 export async function verifyAndEnrichJobLink(job: Partial<JobPosting>): Promise<Partial<JobPosting> | null> {

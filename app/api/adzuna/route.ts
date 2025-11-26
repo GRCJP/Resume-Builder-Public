@@ -1,41 +1,48 @@
 import { NextResponse } from "next/server"
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-
-  const what = searchParams.get("what") || "cybersecurity"
-  const where = searchParams.get("where") || "remote"
-  const page = Number(searchParams.get("page") || "1")
-
-  const app_id = process.env.ADZUNA_APP_ID
-  const app_key = process.env.ADZUNA_APP_KEY
-
-  // LOUD LOGGING FOR DEBUGGING
-  console.log("📡 ADZUNA API REQUEST:", { what, where, page, country: 'US' })
-  console.log("🔑 ADZUNA CREDS:", { hasId: !!app_id, hasKey: !!app_key, idLength: app_id?.length, keyLength: app_key?.length })
-
-  if (!app_id || !app_key) {
-    console.error('❌ Adzuna credentials missing - check .env.local for ADZUNA_APP_ID and ADZUNA_APP_KEY')
-    return NextResponse.json({ error: "Adzuna credentials missing" }, { status: 500 })
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing env var: ${name}`)
   }
+  return value
+}
 
-  const qs = new URLSearchParams({
-    app_id,
-    app_key,
-    what,
-    where,
-    results_per_page: "50",
-    sort_by: "date"
-  })
-
-  // Explicitly use US country
-  const url = `https://api.adzuna.com/v1/api/jobs/us/search/${page}?${qs.toString()}`
-  
-  console.log("🌐 ADZUNA URL:", url.replace(app_key, 'KEY_REDACTED'))
-
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url)
+
+    const what = searchParams.get("what") || "cybersecurity"
+    const where = searchParams.get("where") // OPTIONAL for data dump
+    const page = Number(searchParams.get("page") || "1")
+
+    // Validate Adzuna credentials - fail fast
+    const app_id = requireEnv("ADZUNA_APP_ID")
+    const app_key = requireEnv("ADZUNA_APP_KEY")
+
+    // PHASE 1 DATA DUMP - No location filtering unless explicitly provided
+    console.warn("🚨 PHASE 1 ADZUNA API: PURE DATA DUMP MODE")
+    console.warn("📡 DATA DUMP REQUEST:", { what, where: where || 'ALL LOCATIONS', page, country: 'US' })
+    console.warn("🔑 ADZUNA CREDS:", { hasId: !!app_id, hasKey: !!app_key, idLength: app_id?.length, keyLength: app_key?.length })
+
+    const qs = new URLSearchParams({
+      app_id,
+      app_key,
+      what,
+      results_per_page: "50",
+      sort_by: "date"
+    })
+
+    // Only add location if explicitly provided (Phase 1 data dump)
+    if (where) {
+      qs.append("where", where)
+    }
+
+    const url = `https://api.adzuna.com/v1/api/jobs/us/search/${page}?${qs.toString()}`
+    console.warn("🌐 ADZUNA DATA DUMP URL:", url.replace(app_key, 'KEY_REDACTED'))
+
     const res = await fetch(url)
-    
+
     console.log(`📊 ADZUNA RESPONSE: Status ${res.status} ${res.statusText}`)
 
     if (!res.ok) {

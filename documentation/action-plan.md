@@ -6,7 +6,7 @@
 ```
 🚯 4 months of job applications. 0 interviews. $80 wasted on a "professional" resume writer.
 
-After receiving valuable feedback on resume strategy that changed everything,
+Then I met AJ, whose feedback on resume strategy changed everything.
 
 Instead of just applying his advice, I built an entire system around it:
 
@@ -17,20 +17,22 @@ Instead of just applying his advice, I built an entire system around it:
 
 This isn't just a tool - it's everything I wish I had when starting my job search.
 
+Huge shoutout to AJ for the mentorship and the mantra "share the process" - that's why this is open source and free for fellow GRC professionals.
+
 🔗 GitHub: https://github.com/GRCJP/Resume-Builder
 
 #GRC #Cybersecurity #JobSearch #CareerDevelopment #OpenSource #Mentorship
 ```
 
-**Tags to include:** GRC Engineering Club, cybersecurity groups
+**Tags to include:** @AJ (if you can tag him), GRC Engineering Club, cybersecurity groups
 
 ### **2. GRC Engineering Club (5 minutes)**
 ```
-Subject: I built a GRC Resume Builder based on proven guidance!
+Subject: I built a GRC Resume Builder based on AJ's guidance!
 
 Hey everyone,
 
-After receiving valuable resume guidance,
+After 4 months of job search frustration, I took AJ's resume guidance and built a comprehensive tool around it:
 
 ✅ Real-time job discovery with AI matching
 ✅ ATS optimization with industry benchmarks  
@@ -39,6 +41,8 @@ After receiving valuable resume guidance,
 ✅ Smart fallback system (always shows opportunities)
 
 This is everything I wish I had when starting my job search. Free, open source, built for our community.
+
+Huge thanks to AJ for the mentorship that inspired this!
 
 GitHub: https://github.com/GRCJP/Resume-Builder
 
@@ -59,7 +63,7 @@ After getting zero interviews for 4 months despite strong GRC skills, I built a 
 
 This is everything I wish I had when starting my job search. Free, open source, built for the GRC community.
 
-Based on proven resume strategy for GRC professionals.
+Based on proven resume strategy from AJ at GRC Engineering Club.
 
 Would love feedback from fellow GRC professionals! What features would you add?
 ```
@@ -76,6 +80,8 @@ Then I built a comprehensive GRC Resume Builder that fixes everything:
 🔄 Smart fallback system
 
 Free, open source, built for the GRC community.
+
+Huge thanks to AJ for the mentorship!
 
 🔗 https://github.com/GRCJP/Resume-Builder
 
@@ -163,7 +169,7 @@ Free, open source, built for the GRC community.
 
 ### **What to Highlight:**
 - **Real pain points** you solved
-- **Valuable mentorship impact**
+- **AJ's mentorship impact**
 - **Community focus** (free/open source)
 - **Technical challenges** you overcame
 - **Future improvement** plans

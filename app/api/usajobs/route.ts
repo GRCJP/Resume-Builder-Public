@@ -1,28 +1,34 @@
 import { NextResponse } from "next/server"
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const keyword = searchParams.get("keyword") || "cybersecurity"
-  const location = searchParams.get("location") || "Remote"
-  const page = searchParams.get("page") || "1"
-
-  const apiKey = process.env.USAJOBS_API_KEY
-  const email = process.env.USAJOBS_EMAIL
-
-  // Debug: Check if credentials are present
-  console.log("USAJobs server creds present?", { 
-    hasKey: !!apiKey, 
-    hasEmail: !!email,
-    keyLength: apiKey?.length || 0,
-    email: email || 'none'
-  })
-
-  if (!apiKey || !email) {
-    console.error('❌ USAJobs API credentials not configured on server')
-    return NextResponse.json({ error: "USAJobs credentials missing" }, { status: 500 })
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing env var: ${name}`)
   }
+  return value
+}
 
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url)
+    const keyword = searchParams.get("keyword") || "cybersecurity"
+    const location = searchParams.get("location") || "Remote"
+    const page = searchParams.get("page") || "1"
+
+    // Validate USAJobs credentials - fail fast
+    const apiKey = requireEnv("USAJOBS_API_KEY")
+    const email = requireEnv("USAJOBS_EMAIL")
+
+    console.log("📡 USAJOBS REQUEST:", { 
+      keyword, 
+      location, 
+      page,
+      hasKey: !!apiKey, 
+      hasEmail: !!email,
+      keyLength: apiKey?.length || 0,
+      email: email || 'none'
+    })
+
     const qs = new URLSearchParams({
       Keyword: keyword,
       LocationName: location,
@@ -30,9 +36,10 @@ export async function GET(req: Request) {
       Page: page
     })
 
-    console.log(`🔍 USAJobs API Request: https://data.usajobs.gov/api/search?${qs.toString()}`)
+    const finalUrl = `https://data.usajobs.gov/api/search?${qs.toString()}`
+    console.log("🌐 USAJOBS FINAL URL:", finalUrl)
 
-    const res = await fetch(`https://data.usajobs.gov/api/search?${qs.toString()}`, {
+    const res = await fetch(finalUrl, {
       headers: {
         Host: "data.usajobs.gov",
         "User-Agent": email,
@@ -41,18 +48,37 @@ export async function GET(req: Request) {
     })
 
     if (!res.ok) {
-      console.error(`❌ USAJobs API error: ${res.status} ${res.statusText}`)
       const errorText = await res.text()
-      console.error('Error response:', errorText)
-      return NextResponse.json({ error: `USAJobs API error: ${res.status}` }, { status: res.status })
+      console.error(`❌ USAJobs API error: ${res.status} ${res.statusText}`, errorText)
+      return NextResponse.json({ 
+        error: `USAJobs API error: ${res.status}`, 
+        details: errorText 
+      }, { status: 500 })
     }
 
     const data = await res.json()
-    console.log(`✅ USAJobs API returned ${data.SearchResult?.SearchResultCount || 0} jobs`)
     
+    console.log("📊 USAJOBS RESPONSE:", {
+      hasResults: !!data.SearchResult?.SearchResultItems,
+      resultCount: data.SearchResult?.SearchResultItems?.length || 0,
+      hasError: !!data.error
+    })
+
     return NextResponse.json(data)
+
   } catch (error) {
-    console.error('❌ USAJobs API fetch error:', error)
-    return NextResponse.json({ error: "USAJobs API fetch failed" }, { status: 500 })
+    console.error('❌ USAJOBS ROUTE ERROR:', error)
+    
+    if (error instanceof Error && error.message.includes('Missing env var')) {
+      return NextResponse.json({ 
+        error: error.message,
+        help: "Add USAJOBS_API_KEY and USAJOBS_EMAIL to .env.local"
+      }, { status: 500 })
+    }
+    
+    return NextResponse.json({ 
+      error: "USAJobs route failed", 
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }

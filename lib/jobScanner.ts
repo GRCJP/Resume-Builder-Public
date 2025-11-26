@@ -7,19 +7,23 @@ export interface JobPosting {
   location: string
   description: string
   url: string
-  source: 'indeed' | 'linkedin' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'other' | 'curated' | 'adzuna' | 'serpapi' | 'usajobs' | 'emailAlerts' | 'jsearch'
+  source: 'indeed' | 'linkedin' | 'dice' | 'ziprecruiter' | 'glassdoor' | 'other' | 'curated' | 'adzuna' | 'serpapi' | 'usajobs' | 'emailAlerts' | 'jsearch' | 'linkedin-email' | 'indeed-email' | 'lensa-email'
   postedDate: string
   matchScore: number
   salary?: string
   remote?: boolean
   scannedAt: string
+  linkStatus?: number
+  verifiedAt?: string
+  applyUrl?: string
+  requiresLogin?: boolean
 }
 
 export interface ScanResult {
   totalFound: number
-  highMatches: JobPosting[] // 90%+
-  goodMatches: JobPosting[] // 75-89%
-  fairMatches: JobPosting[] // 50-74%
+  highMatches: Partial<JobPosting>[] // 90%+
+  goodMatches: Partial<JobPosting>[] // 75-89%
+  fairMatches: Partial<JobPosting>[] // 50-74%
   lastScanTime: string
   nextScanTime: string
   pipelineStats?: {
@@ -113,6 +117,177 @@ export const jobBoardAPIs = {
     apiUrl: 'https://data.usajobs.gov/api/search',
     requiresAuth: true,
     note: 'Free API key available - excellent for federal GRC roles'
+  }
+}
+
+/**
+ * Scan job boards for GRC positions based on industry job titles (not resume)
+ * This searches for common GRC cybersecurity roles first, then scores results
+ */
+export async function scanGRCJobsByTitles(location: string, config: Partial<ScanConfig> = {}): Promise<ScanResult> {
+  const { minMatchScore = 50 } = config
+  
+  console.log('🚀 Starting GRC title-based job scan...')
+  console.log(`📍 Location: ${location}`)
+  console.log(`📝 Using GRC industry job titles (no resume required)`)
+  
+  // GRC industry job titles to search for
+  const grcJobTitles = [
+    // Vulnerability Management
+    'vulnerability management analyst',
+    'vulnerability assessment specialist', 
+    'penetration testing engineer',
+    'security analyst',
+    
+    // Risk Management & Assessment
+    'risk assessment specialist',
+    'risk management analyst',
+    'cyber risk analyst',
+    'information risk manager',
+    
+    // Compliance & Governance
+    'compliance analyst',
+    'governance risk compliance analyst',
+    'grc analyst',
+    'security compliance manager',
+    'iso 27001 specialist',
+    'soc 2 compliance analyst',
+    
+    // Audit & Assessment
+    'information security auditor',
+    'it auditor',
+    'cybersecurity auditor',
+    'security assessor',
+    
+    // Control & Framework
+    'security controls analyst',
+    'control testing specialist',
+    'framework specialist',
+    'nist specialist',
+    
+    // Senior Roles
+    'senior grc analyst',
+    'lead security analyst',
+    'cybersecurity manager',
+    'information security manager'
+  ]
+  
+  try {
+    console.log(`🔍 Searching ${grcJobTitles.length} GRC job titles across job boards...`)
+    
+    // Import job board integrations
+    const { searchAdzunaJobs } = await import('./adzunaAPI')
+    const { searchJSearchJobs } = await import('./jsearchAPI') 
+    const { searchSerpApiJobs } = await import('./serpapiJobs')
+    
+    let allJobs: Partial<JobPosting>[] = []
+    let highMatches: Partial<JobPosting>[] = []
+    let goodMatches: Partial<JobPosting>[] = []
+    let fairMatches: Partial<JobPosting>[] = []
+    
+    // Scan Adzuna
+    if (config.includeAdzuna !== false) {
+      console.log('📊 Scanning Adzuna for GRC titles...')
+      try {
+        // Adzuna expects queryBundles (array of arrays)
+        const queryBundles = [
+          grcJobTitles.slice(0, 5),   // First 5 titles
+          grcJobTitles.slice(5, 10),  // Next 5 titles
+        ]
+        const adzunaJobs = await searchAdzunaJobs(queryBundles, 3) // 3 pages per bundle
+        allJobs.push(...adzunaJobs)
+        console.log(`✅ Adzuna found ${adzunaJobs.length} GRC jobs`)
+      } catch (error) {
+        console.warn('⚠️ Adzuna scan failed:', error)
+      }
+    }
+    
+    // Scan JSearch
+    if (config.includeJSearch !== false) {
+      console.log('📊 Scanning JSearch for GRC titles...')
+      try {
+        // Check JSearch function signature
+        const jsearchJobs = await searchJSearchJobs(grcJobTitles.slice(5, 10), 'Remote', 20)
+        allJobs.push(...jsearchJobs)
+        console.log(`✅ JSearch found ${jsearchJobs.length} GRC jobs`)
+      } catch (error) {
+        console.warn('⚠️ JSearch scan failed:', error)
+      }
+    }
+    
+    // Scan SerpApi
+    if (config.includeSerpApi !== false) {
+      console.log('📊 Scanning SerpApi for GRC titles...')
+      try {
+        // Check SerpApi function signature
+        const serpApiJobs = await searchSerpApiJobs(grcJobTitles.slice(10, 15), 'Remote', 20)
+        allJobs.push(...serpApiJobs)
+        console.log(`✅ SerpApi found ${serpApiJobs.length} GRC jobs`)
+      } catch (error) {
+        console.warn('⚠️ SerpApi scan failed:', error)
+      }
+    }
+    
+    // Remove duplicates and score jobs
+    console.log(`🔄 Processing ${allJobs.length} total GRC jobs...`)
+    
+    // Simple scoring based on title relevance (can be enhanced later)
+    allJobs.forEach(job => {
+      const title = job.title?.toLowerCase() || ''
+      let score = 50 // Base score
+      
+      // Higher scores for senior roles
+      if (title.includes('senior') || title.includes('lead') || title.includes('manager')) {
+        score += 20
+      }
+      
+      // Higher scores for specific GRC keywords
+      if (title.includes('grc') || title.includes('governance') || title.includes('compliance')) {
+        score += 15
+      }
+      
+      if (title.includes('vulnerability') || title.includes('risk') || title.includes('assessment')) {
+        score += 10
+      }
+      
+      if (title.includes('iso') || title.includes('soc') || title.includes('nist')) {
+        score += 10
+      }
+      
+      // Assign score and categorize
+      job.matchScore = Math.min(score, 100)
+      
+      if (job.matchScore >= 85) {
+        highMatches.push(job)
+      } else if (job.matchScore >= 70) {
+        goodMatches.push(job)
+      } else {
+        fairMatches.push(job)
+      }
+    })
+    
+    console.log(`✅ GRC title-based scan completed!`)
+    console.log(`📊 Results: ${highMatches.length} high, ${goodMatches.length} good, ${fairMatches.length} fair matches`)
+    
+    return {
+      totalFound: allJobs.length,
+      highMatches,
+      goodMatches,
+      fairMatches,
+      lastScanTime: new Date().toISOString(),
+      nextScanTime: new Date(Date.now() + (config.scanIntervalHours || 24) * 60 * 60 * 1000).toISOString()
+    }
+    
+  } catch (error) {
+    console.error('❌ GRC title-based scan failed:', error)
+    return {
+      totalFound: 0,
+      highMatches: [],
+      goodMatches: [],
+      fairMatches: [],
+      lastScanTime: new Date().toISOString(),
+      nextScanTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    }
   }
 }
 
@@ -449,7 +624,7 @@ async function scanSource(source: string, config: ScanConfig): Promise<Partial<J
       
       case 'momproject':
       case 'the mom project':
-        return await searchMomProjectJobs(config.keywords, location)
+        return await searchMomProjectJobs(config.keywords)
       
       case 'usajobs':
         const usaJobs = await searchUSAJobs({
@@ -466,7 +641,7 @@ async function scanSource(source: string, config: ScanConfig): Promise<Partial<J
           description: job.description,
           url: job.url,
           source: 'other' as const, // Use valid JobPosting source type
-          postedDate: job.postedDate,
+          postedDate: job.posted,
           matchScore: 0,
           scannedAt: new Date().toISOString()
         }))

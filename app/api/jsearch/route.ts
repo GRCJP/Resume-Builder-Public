@@ -1,71 +1,72 @@
 import { NextResponse } from "next/server"
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-
-  const query = searchParams.get("query") || "cybersecurity remote"
-  const page = searchParams.get("page") || "1"
-  const num_pages = searchParams.get("num_pages") || "1"
-  const country = searchParams.get("country") || "us" // Explicitly default to US
-
-  const apiKey = process.env.OPENWEB_JSEARCH_KEY
-  
-  console.log("📡 JSEARCH (OpenWeb Ninja) REQUEST:", { 
-    query, 
-    page, 
-    num_pages,
-    country, // Explicitly log country
-    hasKey: !!apiKey, 
-    keyLength: apiKey?.length || 0,
-    keyStart: apiKey?.substring(0, 8) + "..." || "none"
-  })
-  
-  if (!apiKey) {
-    console.error('❌ OpenWeb Ninja JSearch credentials missing - need OPENWEB_JSEARCH_KEY in .env.local')
-    return NextResponse.json({ error: "JSearch key missing - add OPENWEB_JSEARCH_KEY to .env.local" }, { status: 500 })
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing env var: ${name}`)
   }
+  return value
+}
 
-  // OpenWeb Ninja JSearch endpoint (explicitly include country=us)
-  const url = `https://api.openwebninja.com/v1/jsearch/search?query=${encodeURIComponent(query)}&page=${page}&num_pages=${num_pages}&country=${country}`
-  
-  console.log(`🌐 JSEARCH URL: ${url}`)
-
+export async function GET(req: Request) {
   try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'X-API-Key': apiKey,  // OpenWeb Ninja uses X-API-Key header
-        'Content-Type': 'application/json'
-      }
+    const { searchParams } = new URL(req.url)
+
+    const query = searchParams.get("query") || "cybersecurity remote"
+    const page = searchParams.get("page") || "1"
+    const num_pages = searchParams.get("num_pages") || "1"
+    const country = searchParams.get("country") || "us" // Explicitly default to US
+
+    // Validate JSEARCH_RAPIDAPI_KEY - fail fast
+    const apiKey = requireEnv("JSEARCH_RAPIDAPI_KEY")
+    
+    console.log("📡 JSEARCH (RapidAPI) REQUEST:", { 
+      query, 
+      page, 
+      num_pages,
+      country, // Explicitly log country
+      hasKey: !!apiKey, 
+      keyLength: apiKey?.length || 0,
+      keyStart: apiKey?.substring(0, 8) + "..." || "none"
     })
 
-    console.log(`📊 JSEARCH RESPONSE: Status ${res.status} ${res.statusText}`)
-
-    if (!res.ok) {
-      const text = await res.text()
-      console.error(`❌ JSearch API HTTP ${res.status}:`, text)
-      console.error(`❌ Request was: ${url}`)
-      
-      // Check for subscription/auth issues
-      if (res.status === 401 || res.status === 403) {
-        console.error('❌ OpenWeb Ninja JSearch authentication failed - check API key')
-        return NextResponse.json({ 
-          error: "JSearch API authentication failed - check OPENWEB_JSEARCH_KEY", 
-          authRequired: true,
-          status: res.status,
-          body: text
-        }, { status: 401 })
+    const options = {
+      method: "GET",
+      headers: {
+        "X-RapidAPI-Key": apiKey,
+        "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
       }
-      
-      return NextResponse.json({ 
-        error: `JSearch API error: ${res.status} - ${text}`,
-        status: res.status,
-        body: text
-      }, { status: res.status })
     }
 
-    const data = await res.json()
+    const qs = new URLSearchParams({
+      query,
+      page,
+      num_pages,
+      country
+    })
+
+    const finalUrl = `https://jsearch.p.rapidapi.com/search?${qs.toString()}`
+    console.log("🌐 JSEARCH FINAL URL:", finalUrl)
+
+    const response = await fetch(finalUrl, options)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ JSearch API error:', { status: response.status, statusText: response.statusText, errorText })
+      return NextResponse.json({ 
+        error: `JSearch API error: ${response.status}`, 
+        details: errorText 
+      }, { status: 500 })
+    }
+
+    const data = await response.json()
     
+    console.log("📊 JSEARCH RESPONSE:", {
+      hasData: !!data.data,
+      resultCount: data.data?.length || 0,
+      hasError: !!data.error
+    })
+
     if (data.error) {
       console.error(`❌ JSearch API returned error object:`, data.error)
       return NextResponse.json({ 

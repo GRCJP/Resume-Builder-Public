@@ -8,6 +8,8 @@ export interface USAJobsSearchParams {
   resultsPerPage?: number
 }
 
+import type { JobPosting } from "./jobScanner"
+
 export interface USAJob {
   id: string
   title: string
@@ -28,7 +30,7 @@ export interface USAJob {
 /**
  * Search USAJobs API via server route to avoid CORS issues
  */
-export async function searchUSAJobs(params: USAJobsSearchParams): Promise<USAJob[]> {
+export async function searchUSAJobs(params: USAJobsSearchParams, options?: { signal?: AbortSignal }): Promise<USAJob[]> {
   try {
     const qs = new URLSearchParams({
       keyword: params.keyword || "cybersecurity",
@@ -36,9 +38,11 @@ export async function searchUSAJobs(params: USAJobsSearchParams): Promise<USAJob
       page: params.page?.toString() || "1"
     })
 
-    console.log(`🔍 USAJobs: Searching via server route - keyword: ${params.keyword}, location: ${params.location}`)
+    console.log(`🔍 USAJobs API Request: /api/usajobs?${qs.toString()}`)
+
+    const res = await fetch(`/api/usajobs?${qs.toString()}`, options)
     
-    const res = await fetch(`/api/usajobs?${qs.toString()}`)
+    console.log(`📊 USAJobs RESPONSE: Status ${res.status} ${res.statusText}`)
     
     if (!res.ok) {
       console.error(`❌ USAJobs server route error: ${res.status} ${res.statusText}`)
@@ -97,6 +101,85 @@ export async function searchUSAJobs(params: USAJobsSearchParams): Promise<USAJob
     console.error('❌ USAJobs search error:', error)
     return []
   }
+}
+
+/**
+ * PHASE 1: PURE DATA DUMP - Maximum federal jobs, no filters
+ */
+export async function searchUSAJobsDataDump(): Promise<Partial<JobPosting>[]> {
+  console.warn('🚨 PHASE 1 USAJOBS: Starting pure federal data dump - no filters')
+  
+  // Broad federal keywords for maximum coverage
+  const federalKeywords = [
+    'cybersecurity',
+    'security', 
+    'information security',
+    'risk management',
+    'compliance',
+    'audit',
+    'governance',
+    'grc',
+    'privacy',
+    'controls',
+    'information technology',
+    'it'
+  ]
+  
+  // Major federal hubs + no location filter
+  const locations = ['Washington DC', 'Remote', '']
+  const allJobs: USAJob[] = []
+  
+  for (const keyword of federalKeywords) {
+    for (const location of locations) {
+      try {
+        console.warn(`📄 USAJobs Data Dump: "${keyword}" in "${location || 'ALL LOCATIONS'}"`)
+        
+        // Add timeout to prevent hanging
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+        
+        const jobs = await searchUSAJobs({ 
+          keyword, 
+          location: location || undefined,
+          page: 1
+        }, { signal: controller.signal })
+        
+        clearTimeout(timeoutId)
+        
+        if (jobs.length > 0) {
+          console.warn(`✅ USAJobs Data Dump: ${jobs.length} jobs for "${keyword}"`)
+          allJobs.push(...jobs)
+        }
+        
+        // Small delay to be respectful
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+      } catch (error) {
+        console.warn(`❌ USAJobs Data Dump failed for "${keyword}":`, error)
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn('⏰ USAJobs request timed out after 15 seconds')
+        }
+      }
+    }
+  }
+  
+  console.warn(`🚨 PHASE 1 USAJOBS COMPLETE: ${allJobs.length} federal jobs collected`)
+  
+  // Convert USAJob[] to Partial<JobPosting>[]
+  return allJobs.map((job: USAJob) => ({
+    id: `usajobs-${job.id}`,
+    title: job.title,
+    company: job.organization,
+    location: job.location,
+    description: job.description,
+    url: job.url,
+    source: 'usajobs',
+    postedDate: job.posted,
+    matchScore: 0,
+    salary: job.salary ? `${job.salary.min}-${job.salary.max}` : undefined,
+    remote: job.remote,
+    scannedAt: new Date().toISOString()
+  }))
 }
 
 /**

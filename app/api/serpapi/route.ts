@@ -1,53 +1,82 @@
 import { NextResponse } from "next/server"
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-
-  const q = searchParams.get("q") || "cybersecurity remote"
-  const location = searchParams.get("location") || "United States"
-  const start = searchParams.get("start") || "0" // pagination offset
-  const hl = searchParams.get("hl") || "en"
-  const gl = searchParams.get("gl") || "us"
-
-  const apiKey = process.env.SERPAPI_API_KEY
-  if (!apiKey) {
-    console.error('❌ SerpApi credentials missing')
-    return NextResponse.json({ error: "SerpApi key missing" }, { status: 500 })
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing env var: ${name}`)
   }
+  return value
+}
 
-  const qs = new URLSearchParams({
-    engine: "google_jobs",
-    q,
-    location,
-    hl,
-    gl,
-    api_key: apiKey
-  })
-
-  const url = `https://serpapi.com/search.json?${qs.toString()}`
-  
-  console.log(`🔍 SerpApi API: ${url}`)
-
+export async function GET(req: Request) {
   try {
-    const res = await fetch(url)
+    const { searchParams } = new URL(req.url)
+
+    const q = searchParams.get("q") || "cybersecurity remote"
+    const location = searchParams.get("location") || "United States"
+    const start = searchParams.get("start") || "0" // pagination offset
+    const hl = searchParams.get("hl") || "en"
+    const gl = searchParams.get("gl") || "us"
+
+    // Validate SERPAPI_API_KEY - fail fast
+    const apiKey = requireEnv("SERPAPI_API_KEY")
+    
+    console.log("📡 SERPAPI REQUEST:", { 
+      q, 
+      location, 
+      start, 
+      hl, 
+      gl,
+      hasKey: !!apiKey, 
+      keyLength: apiKey?.length || 0
+    })
+
+    const qs = new URLSearchParams({
+      engine: "google_jobs",
+      q,
+      location,
+      hl,
+      gl,
+      api_key: apiKey
+    })
+
+    const finalUrl = `https://serpapi.com/search?${qs.toString()}`
+    console.log("🌐 SERPAPI FINAL URL:", finalUrl.replace(apiKey, "***REDACTED***"))
+
+    const res = await fetch(finalUrl)
 
     if (!res.ok) {
-      const text = await res.text()
-      console.error(`❌ SerpApi API error: ${res.status} - ${text}`)
-      return NextResponse.json({ error: text }, { status: res.status })
+      const errorText = await res.text()
+      console.error('❌ SerpApi API error:', { status: res.status, statusText: res.statusText, errorText })
+      return NextResponse.json({ 
+        error: `SerpApi API error: ${res.status}`, 
+        details: errorText 
+      }, { status: 500 })
     }
 
     const data = await res.json()
     
-    if (data.error) {
-      console.error(`❌ SerpApi API returned error:`, data.error)
-      return NextResponse.json({ error: data.error }, { status: 400 })
-    }
+    console.log("📊 SERPAPI RESPONSE:", {
+      hasResults: !!data.jobs_results,
+      resultCount: data.jobs_results?.length || 0,
+      hasError: !!data.error
+    })
 
-    console.log(`✅ SerpApi API: ${data.jobs_results?.length || 0} jobs returned`)
     return NextResponse.json(data)
+
   } catch (error) {
-    console.error('❌ SerpApi API fetch error:', error)
-    return NextResponse.json({ error: "SerpApi API fetch failed" }, { status: 500 })
+    console.error('❌ SERPAPI ROUTE ERROR:', error)
+    
+    if (error instanceof Error && error.message.includes('Missing env var')) {
+      return NextResponse.json({ 
+        error: error.message,
+        help: "Add SERPAPI_API_KEY to .env.local"
+      }, { status: 500 })
+    }
+    
+    return NextResponse.json({ 
+      error: "SerpApi route failed", 
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }

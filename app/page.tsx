@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Briefcase, Search, List } from 'lucide-react'
-import ResumeManager from '@/components/ResumeManager'
-import JobDiscoveryDashboard from '@/components/JobDiscoveryDashboard'
-import ApplicationTracker from '@/components/ApplicationTracker'
-import Logo from '@/components/Logo'
-import ErrorBoundary, { setupGlobalErrorHandlers } from '@/components/ErrorBoundary'
+import { Briefcase, Search, List, Building2 } from 'lucide-react'
+import ResumeManager from '../components/ResumeManager'
+import JobDiscoveryDashboard from '../components/JobDiscoveryDashboard'
+import ApplicationTracker from '../components/ApplicationTracker'
+import USAJobsDashboard from '../components/USAJobsDashboard'
+import Logo from '../components/Logo'
+import ErrorBoundary, { setupGlobalErrorHandlers } from '../components/ErrorBoundary'
 
 interface Resume {
   id: string
@@ -19,7 +20,7 @@ interface Resume {
 export default function Home() {
   const [resumes, setResumes] = useState<Resume[]>([])
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'discovery' | 'tracker'>('discovery')
+  const [activeTab, setActiveTab] = useState<'discovery' | 'usajobs' | 'tracker'>('discovery')
   const [jobDescriptionForTailoring, setJobDescriptionForTailoring] = useState<string>('')
 
   // Setup global error handlers for browser extension conflicts
@@ -117,6 +118,17 @@ export default function Home() {
               Job Discovery
             </button>
             <button
+              onClick={() => setActiveTab('usajobs')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
+                activeTab === 'usajobs'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
+                  : 'bg-slate-800/50 text-blue-300 hover:bg-slate-800 hover:text-blue-100'
+              }`}
+            >
+              <Building2 className="w-5 h-5" />
+              USA Jobs
+            </button>
+            <button
               onClick={() => setActiveTab('tracker')}
               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
                 activeTab === 'tracker'
@@ -133,6 +145,12 @@ export default function Home() {
           <div className="min-h-[600px]">
             {activeTab === 'discovery' ? (
               <JobDiscoveryDashboard
+                resumeContent={resumeContent}
+                selectedResumeName={selectedResume?.name || ''}
+                onTailorResume={handleTailorResume}
+              />
+            ) : activeTab === 'usajobs' ? (
+              <USAJobsDashboard
                 resumeContent={resumeContent}
                 selectedResumeName={selectedResume?.name || ''}
                 onTailorResume={handleTailorResume}
