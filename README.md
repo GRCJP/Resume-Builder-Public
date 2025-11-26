@@ -192,7 +192,7 @@ This portfolio project demonstrates how GRC engineering principles can solve rea
 
 ## 📚 Foundational Strategy
 
-This tool is built on the proven resume strategy from AJ's "How to Build a Resume That Opens Doors" article. [Read the complete strategy that shaped this project](./documentation/resume-guidance.md).
+This tool is built on proven resume strategy for GRC professionals. [Read the complete strategy that shaped this project](./documentation/resume-guidance.md).
 
 ---
 

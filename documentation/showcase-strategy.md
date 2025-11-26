@@ -5,7 +5,7 @@
 ### **Primary Platforms**
 1. **LinkedIn** - Professional network, hiring managers active here
 2. **GitHub** - Technical community, collaboration opportunities
-3. **GRC Engineering Club** - Your target audience, AJ's community
+3. **GRC Engineering Club** - Your target audience, GRC professional community
 4. **Reddit** - r/cybersecurity, r/jobs, r/sysadmin
 5. **Twitter/X** - Tech community, quick visibility
 6. **Dev.to** - Developer-focused storytelling
@@ -16,7 +16,7 @@
 ```
 🚯 4 months of job applications. 0 interviews. $80 wasted on a "professional" resume writer.
 
-Then I met AJ, whose feedback on resume strategy changed everything.
+After receiving valuable feedback on resume strategy that changed everything.
 
 Instead of just applying his advice, I built an entire system around it:
 
@@ -27,7 +27,7 @@ Instead of just applying his advice, I built an entire system around it:
 
 This isn't just a tool - it's everything I wish I had when starting my job search.
 
-Huge shoutout to AJ for the mentorship and the mantra "share the process" - that's why this is open source and free for fellow GRC professionals.
+Huge thanks to the mentors who guided me - their mantra "share the process" is why this is open source and free for fellow GRC professionals.
 
 🔗 GitHub: https://github.com/GRCJP/Resume-Builder
 
@@ -59,7 +59,7 @@ I built a comprehensive GRC Resume Builder after 4 months of job search frustrat
 - **Application Tracking** - Kanban workflow with persistence
 
 ### 📚 Built on Proven Strategy
-Based on AJ's "Signal, Not Biography" philosophy from GRC Engineering Club.
+Based on proven "Signal, Not Biography" philosophy for GRC professionals.
 
 Every feature addresses real job search pain points I experienced firsthand.
 
@@ -80,7 +80,7 @@ After getting zero interviews for 4 months despite strong GRC skills, I built a 
 
 This is everything I wish I had when starting my job search. Free, open source, built for the GRC community.
 
-Based on proven resume strategy from AJ at GRC Engineering Club.
+Based on proven resume strategy for GRC professionals.
 
 Would love feedback from fellow GRC professionals! What features would you add?
 ```
@@ -145,7 +145,7 @@ Would love feedback from fellow GRC professionals! What features would you add?
 ## 🎯 Next Steps
 
 ### **Immediate Actions (This Week)**
-1. **Post on LinkedIn** - Tag AJ and GRC Engineering Club
+1. **Post on LinkedIn** - Share with GRC community
 2. **Share in GRC Engineering Club** - Your primary audience
 3. **Post on Reddit** - r/cybersecurity and r/jobs
 4. **Tweet about it** - Tag relevant cybersecurity accounts
