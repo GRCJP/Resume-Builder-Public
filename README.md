@@ -93,9 +93,18 @@ Choose one or more:
 
 ## 📚 Documentation
 
-- **[Development Guide](./DEVELOPMENT.md)** - Setup and contribution instructions
-- **[Community Setup](./COMMUNITY_SETUP.md)** - API configuration details
-- **[Contributing Guidelines](./CONTRIBUTING.md)** - How to contribute
+### **🚀 New to the project? Start here:**
+- **[⚡ Quick Start Guide](./QUICK_START.md)** - 5-minute setup and first contribution
+- **[📖 Documentation Hub](./docs/README.md)** - Complete documentation index
+
+### **🛠️ Development Resources:**
+- **[🛠️ Development Setup](./docs/development/development-setup.md)** - Complete development environment
+- **[🤝 Contributing Guide](./docs/development/contributing-guide.md)** - How to contribute effectively
+- **[🔌 API Setup Guide](./docs/getting-started/API_SETUP.md)** - Configure API integrations
+
+### **📚 Additional Resources:**
+- **[JSearch Setup](./JSEARCH_SETUP.md)** - Specific JSearch API integration guide
+- **[Project Documentation](./documentation/)** - In-depth project documentation
 
 ---
 
