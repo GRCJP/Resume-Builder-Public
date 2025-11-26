@@ -8,7 +8,8 @@
 
 ### **New to the project? Start here:**
 - **[⚡ Quick Start Guide](../QUICK_START.md)** - 5-minute setup and first contribution
-- **[🛠️ API Setup Guide](../API_SETUP.md)** - Configure API integrations
+- **[✅ API Setup Checklist](./getting-started/API-SETUP-CHECKLIST.md)** - Step-by-step API setup checklist
+- **[🛠️ API Setup Guide](./getting-started/API_SETUP.md)** - Complete API integration instructions
 - **[📖 Project Overview](../README.md)** - Understand what this project does
 
 ---
