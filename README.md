@@ -83,43 +83,104 @@ cp .env.example .env.local
 
 ---
 
-## 🔌 API Integration Setup
+## 🔌 Complete API Integration Setup
 
-### **🇺🇸 USAJobs API**
-1. Visit [USAJobs Developer Portal](https://developer.usajobs.gov/)
-2. Sign up for API access
-3. Add to `.env.local`: `USAJOBS_API_KEY=your_key`
+### **🇺🇸 USAJobs API (Federal Jobs)**
+**Setup Time: 5 minutes | Cost: FREE**
+- **Purpose**: Federal government job board for GRC positions
+- **Features**: Federal jobs, security clearance positions, GS level matching
+- **Setup**: 
+  1. Visit [USAJobs Developer Portal](https://developer.usajobs.gov/)
+  2. Sign up for API access (5-minute process)
+  3. Add to `.env.local`: `USAJOBS_API_KEY=your_key` and `USAJOBS_USER_AGENT=your_email`
 
-### **📧 Gmail Integration**
-1. Visit [Google Cloud Console](https://console.cloud.google.com/)
-2. Create OAuth2 credentials
-3. Add to `.env.local`: Gmail OAuth settings
+### **📧 Gmail OAuth (Email Parsing)**
+**Setup Time: 10 minutes | Cost: FREE**
+- **Purpose**: Parse job alert emails from LinkedIn, Indeed, Lensa
+- **Features**: Automatic job extraction from email alerts
+- **Setup**:
+  1. Visit [Google Cloud Console](https://console.cloud.google.com/)
+  2. Create OAuth2 credentials with Gmail API
+  3. Add to `.env.local`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
 
-### **🔍 Job Board APIs**
-Choose one or more:
-- **Adzuna** - Free tier available
-- **SerpApi** - Google Jobs integration
-- **JSearch** - Comprehensive job database
+### **🔍 Job Board APIs (Choose One or More)**
+
+#### **JSearch API (Recommended)**
+**Setup Time: 5 minutes | Cost: FREE (100 requests/month)**
+- **Purpose**: Comprehensive job database with advanced filtering
+- **Features**: Real-time jobs, company information, salary data
+- **Setup**:
+  1. Visit [RapidAPI](https://rapidapi.com/hub)
+  2. Subscribe to JSearch API (FREE tier available)
+  3. Add to `.env.local`: `JSEARCH_RAPIDAPI_KEY=your_key`
+
+#### **Adzuna API**
+**Setup Time: 3 minutes | Cost: FREE (1,000 requests/month)**
+- **Purpose**: Job board aggregation with company insights
+- **Features**: Job market trends, salary comparisons
+- **Setup**:
+  1. Visit [Adzuna Developer Portal](https://developer.adzuna.com/)
+  2. Apply for API access (instant approval)
+  3. Add to `.env.local`: `ADZUNA_APP_ID=your_id` and `ADZUNA_API_KEY=your_key`
+
+#### **SerpApi (Google Jobs)**
+**Setup Time: 3 minutes | Cost: FREE (100 searches/month)**
+- **Purpose**: Google Jobs search integration
+- **Features**: Google-powered job search, comprehensive coverage
+- **Setup**:
+  1. Visit [SerpApi](https://serpapi.com/)
+  2. Create free account
+  3. Add to `.env.local`: `SERPAPI_KEY=your_key`
+
+### **📧 Email Alert Integrations (FREE)**
+**Setup Time: 5 minutes each | Cost: FREE**
+- **LinkedIn Email Alerts** - Set up job alerts → Auto-parse in app
+- **Indeed Email Alerts** - Configure email notifications → Extract jobs
+- **Lensa Email Alerts** - Create job alerts → Import automatically
+
+### **⚡ Quick Setup Summary**
+```bash
+# Required for Full Functionality (ALL FREE):
+✅ USAJobs API (5 min) - Federal GRC jobs
+✅ Gmail OAuth (10 min) - Email parsing
+✅ One Job Board API (3-5 min) - Private sector jobs
+✅ Email Alerts (5 min each) - LinkedIn/Indeed/Lensa
+
+# Total Setup Time: 20-30 minutes for complete functionality
+```
+
+### **📋 Complete Setup Guide**
+For detailed step-by-step instructions with troubleshooting:
+- **[✅ API Setup Checklist](./docs/getting-started/API-SETUP-CHECKLIST.md)** - Step-by-step checklist
+- **[🛠️ Complete API Setup Guide](./docs/getting-started/API_SETUP.md)** - Detailed instructions
+- **[🔌 API Integration Documentation](./docs/api/)** - Technical implementation details
 
 ---
 
-## 📚 Documentation
+## 📚 Complete Documentation
 
 ### **🚀 New to the project? Start here:**
 - **[⚡ Quick Start Guide](./QUICK_START.md)** - 5-minute setup and first contribution
+- **[✅ API Setup Checklist](./docs/getting-started/API-SETUP-CHECKLIST.md)** - Step-by-step API setup
 - **[📖 Documentation Hub](./docs/README.md)** - Complete documentation index
 
 ### **🛠️ Development Resources:**
 - **[🛠️ Development Setup](./docs/development/development-setup.md)** - Complete development environment
 - **[🤝 Contributing Guide](./docs/development/contributing-guide.md)** - How to contribute effectively
-- **[🔌 API Setup Guide](./docs/getting-started/API_SETUP.md)** - Configure API integrations
+- **[🎯 ATS Scoring Model](./docs/development/ats-scoring-model.md)** - Industry-standard scoring system
 
-### **📚 Additional Resources:**
-- **[🔌 Complete API Documentation](./docs/api/)** - Detailed API integration guides for all services
+### **🔌 API Integration Documentation:**
+- **[🔌 API Integration Guide](./docs/api/api-integration-guide.md)** - Complete overview of all APIs
+- **[🇺🇸 USAJobs API](./docs/api/usajobs-api.md)** - Federal jobs detailed setup
+- **[📧 Gmail Integration](./docs/api/gmail-api.md)** - Email parsing and OAuth setup
+- **[🔍 Job Board APIs](./docs/api/job-board-apis.md)** - JSearch, Adzuna, SerpApi setup
+- **[🔧 API Reference](./docs/api/reference.md)** - Complete API documentation
+
+### **📚 Training & Learning:**
 - **[📚 Training Program](./docs/training/training-program.md)** - Complete 4-week training curriculum
-- **[📖 Documentation Hub](./docs/README.md)** - Complete documentation index
-- **[JSearch Setup](./JSEARCH_SETUP.md)** - Specific JSearch API integration guide
-- **[Project Documentation](./documentation/)** - In-depth project documentation
+- **[🎯 Lesson Plans](./docs/training/lesson-plans.md)** - Detailed lesson plans and exercises
+- **[🛠️ Practical Projects](./docs/training/projects.md)** - Hands-on project assignments
+- **[📋 Assessment Guide](./docs/training/assessment.md)** - Knowledge checks and certification
 
 ---
 
