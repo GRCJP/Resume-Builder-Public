@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "test": "echo 'No tests configured yet' && exit 0",
+    "quality-check": "npm run lint && npm run type-check && npm run build",
+    "quality-gates": "./scripts/quality-check.sh"
   },
   "dependencies": {
     "docx": "^9.5.1",
